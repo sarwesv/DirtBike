@@ -8,6 +8,30 @@ Dirt trails wind endlessly across the map. Each one is a contour line of domain-
 
 Pick from four bikes in the garage: Trail 250, Pit 125, Enduro 450 and Rally 500.
 
+## Project layout
+
+No build step. `index.html` loads the stylesheet, three.js from a CDN, then the game scripts in order. The scripts are plain (non-module) files that share one global scope, so the game also runs straight from disk by double-clicking `index.html`.
+
+```
+index.html          markup: HUD, touch controls, title screen and garage
+css/style.css       all styling, including the responsive and touch layouts
+js/core.js          math helpers and seeded Perlin noise (with derivatives)
+js/world.js         terrain height, Perlin noise trails, ramps, chunk contents
+js/renderer.js      renderer, sky, lighting, water, terrain material and meshes
+js/scenery.js       trees, rocks, grass, chunk streaming, distant terrain, clouds
+js/bikes.js         bike specs, bike and rider model, garage picker
+js/effects.js       tyre tracks and dust particles
+js/audio.js         engine sound and effects
+js/controls.js      save data, game state, keyboard and touch input
+js/physics.js       riding, jumps, tricks, landings, crashes, flags
+js/view.js          bike model sync and chase camera
+js/minimap.js       heading-up minimap
+js/hud.js           speedometer, gears, surface and score readouts
+js/main.js          resize, adaptive quality, frame loop and start-up
+```
+
+Load order matters: each file may use anything declared in the files before it.
+
 ## Play
 
 Open `index.html` in a browser, or serve the folder with any static server (e.g. `python3 -m http.server`). It also works on GitHub Pages.
