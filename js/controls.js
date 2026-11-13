@@ -54,19 +54,20 @@ let touchSteer = null;
 $('touch').addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') togglePause(); });
 {
-  const btn = $('btnFull'), root = document.documentElement;
+  const btns = document.querySelectorAll('.js-full'), root = document.documentElement;
   const req = root.requestFullscreen || root.webkitRequestFullscreen, exit = document.exitFullscreen || document.webkitExitFullscreen;
-  if (!req) btn.hidden = true;
-  btn.addEventListener('click', () => {
+  const hideAll = () => btns.forEach(b => { b.hidden = true; });
+  if (!req) hideAll();
+  btns.forEach(btn => btn.addEventListener('click', () => {
     try {
       if (document.fullscreenElement || document.webkitFullscreenElement) { const r = exit.call(document); if (r && r.catch) r.catch(() => {}); }
       else {
         const r = req.call(root);
-        if (r && r.then) r.then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => { btn.hidden = true; });
+        if (r && r.then) r.then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(hideAll);
       }
-    } catch (e) { btn.hidden = true; }
-  });
-  const sync = () => { btn.textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? 'Exit full screen' : 'Full screen'; };
+    } catch (e) { hideAll(); }
+  }));
+  const sync = () => { const t = (document.fullscreenElement || document.webkitFullscreenElement) ? 'Exit full screen' : 'Full screen'; btns.forEach(b => { b.textContent = t; }); };
   document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync);
 }
 
@@ -77,9 +78,9 @@ const shown = {};
 function setText(k, v) { if (shown[k] !== v) { shown[k] = v; el[k].textContent = v; } }
 function flash(node, html) { node.innerHTML = html; node.classList.remove('show'); void node.offsetWidth; node.classList.add('show'); }
 function cycleCam() { camMode = (camMode + 1) % 3; }
-function toggleMute() { muted = !muted; $('btnSound').textContent = muted ? 'Sound off' : 'Sound on'; }
+function toggleMute() { muted = !muted; document.querySelectorAll('.js-sound').forEach(b => { b.textContent = muted ? 'Sound off' : 'Sound on'; }); }
 $('btnCam').addEventListener('click', cycleCam);
-$('btnSound').addEventListener('click', () => { initAudio(); toggleMute(); });
+document.querySelectorAll('.js-sound').forEach(b => b.addEventListener('click', () => { initAudio(); toggleMute(); }));
 $('btnPause').addEventListener('click', togglePause);
 $('btnRide').addEventListener('click', startRide);
 function startRide() { initAudio(); state = 'play'; titleEl.hidden = true; hud.hidden = false; last = performance.now(); }
