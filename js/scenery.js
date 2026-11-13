@@ -283,7 +283,13 @@ function updateFar(all) {
 function updateChunks(all) {
   const pcx = Math.floor(bike.x / CS), pcz = Math.floor(bike.z / CS);
   const inHole = (cx, cz) => farRegion && cx >= farRegion.cx0 && cx <= farRegion.cx1 && cz >= farRegion.cz0 && cz <= farRegion.cz1;
-  for (const [k, ch] of chunks) if (Math.max(Math.abs(ch.cx - pcx), Math.abs(ch.cz - pcz)) > VIEW_R && !inHole(ch.cx, ch.cz)) disposeChunk(k);
+  for (const [k, ch] of chunks) {
+    const dist = Math.max(Math.abs(ch.cx - pcx), Math.abs(ch.cz - pcz));
+    if (dist > VIEW_R && !inHole(ch.cx, ch.cz)) { disposeChunk(k); continue; }
+    // Shadows only reach ~40 m, so far chunks skip the shadow pass (matters in Deep Forest).
+    const near = dist <= 1;
+    if (ch.near !== near) { ch.near = near; ch.inst.forEach(m => { m.castShadow = near; }); }
+  }
   const need = [];
   for (let j = -VIEW_R; j <= VIEW_R; j++) for (let i = -VIEW_R; i <= VIEW_R; i++) if (!chunks.has((pcx + i) + ',' + (pcz + j))) need.push([pcx + i, pcz + j, i * i + j * j]);
   need.sort((a, b) => a[2] - b[2]);

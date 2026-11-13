@@ -5,9 +5,27 @@
 
 /* ---------- World shape ---------- */
 const WATER = 0, CELL = 4, CN = 50, CS = CELL * CN, VIEW_R = 2;
-function desertness(x, z) { return smooth(0.12, 0.38, noise(x * 0.0011 + 77.3, z * 0.0011 - 33.1)); }
-function mountainMask(x, z) { return smooth(0.08, 0.42, noise(x * 0.0008 - 40.7, z * 0.0008 + 21.9)); }
-function forestness(x, z) { return smooth(-0.15, 0.35, noise(x * 0.0045 + 5.2, z * 0.0045 - 8.4)); }
+/* Maps. Each one reshapes the same noise world: biome mix, mountain size, tree count, snow line and sky. */
+const WORLDS = [
+  { id: 'open', name: 'Open Country', blurb: 'Meadows, pine stands, desert edges, lakes and snowy ridges.', swatch: '#7fa64a',
+    desert: null, mount: 1, mountCover: 0, base: 0, forest: 0, trees: 120, bushes: 70, snowLine: 60, treeLine: 64,
+    fog: 0.00125, horizon: '#c9d6db', top: '#3d78b6', below: '#97a39a', sun: '#fff1d8' },
+  { id: 'forest', name: 'Deep Forest', blurb: 'Dense pines and oaks split by narrow trails. Mind the trunks.', swatch: '#2f5a2c',
+    desert: 0, mount: 0.45, mountCover: 0, base: 1.5, forest: 0.6, trees: 400, bushes: 150, snowLine: 90, treeLine: 80,
+    fog: 0.0024, horizon: '#b4c4b8', top: '#5d86a4', below: '#7f8f80', sun: '#ffe7c2' },
+  { id: 'desert', name: 'Red Desert', blurb: 'Endless dunes, cacti and rock ridges. No lakes, lots of air.', swatch: '#d9995a',
+    desert: 1, mount: 0.8, mountCover: 0, base: 7, forest: -1, trees: 130, bushes: 0, snowLine: 200, treeLine: 200,
+    fog: 0.0009, horizon: '#e6d2b4', top: '#4a8ac6', below: '#c9b08c', sun: '#fff0cf' },
+  { id: 'alpine', name: 'Alpine Ridge', blurb: 'Big mountains, snowfields and steep pine slopes.', swatch: '#dfe8ee',
+    desert: 0, mount: 1.6, mountCover: 0.28, base: 4, forest: 0.1, trees: 170, bushes: 40, snowLine: 36, treeLine: 46,
+    fog: 0.001, horizon: '#d2dce3', top: '#2c6cb4', below: '#a6b1b6', sun: '#ffffff' }
+];
+let W = WORLDS[0];
+// Open Country keeps the original flag ids so earlier saves still count.
+const flagPrefix = () => W.id === 'open' ? '' : W.id + '/';
+function desertness(x, z) { return W.desert !== null ? W.desert : smooth(0.12, 0.38, noise(x * 0.0011 + 77.3, z * 0.0011 - 33.1)); }
+function mountainMask(x, z) { return smooth(0.08 - W.mountCover, 0.42 - W.mountCover, noise(x * 0.0008 - 40.7, z * 0.0008 + 21.9)); }
+function forestness(x, z) { return clamp(smooth(-0.15, 0.35, noise(x * 0.0045 + 5.2, z * 0.0045 - 8.4)) + W.forest, 0, 1); }
 /* Trails: one contour line of domain-warped Perlin noise. Contours never end or branch, so the trail
    winds forever across the map. Dividing by the gradient turns the noise value into metres from the centre line. */
 const TR_F = 0.0021, WARP_F = 0.0042, WARP_A = 38, TR_K = WARP_A * WARP_F, TR_HALF = 2.6;
@@ -33,7 +51,7 @@ function mountainAt(x, z) {
   if (mm <= 0) return 0;
   const r = 1 - Math.abs(fbm(x * 0.0026 + 3.1, z * 0.0026 + 9.4, 3));
   const d2 = x * x + z * z;
-  return mm * r * r * r * 95 * (d2 < 170 * 170 ? smooth(90, 170, Math.sqrt(d2)) : 1);
+  return mm * r * r * r * 95 * W.mount * (d2 < 170 * 170 ? smooth(90, 170, Math.sqrt(d2)) : 1);
 }
 const trailAt = (x, z) => trailDistS(x, z, mountainAt(x, z));
 let lastTrailD = 99;
@@ -41,15 +59,15 @@ function rawHeight(x, z) {
   const hills = fbm(x * 0.0032 + 11.3, z * 0.0032 - 7.7, 4) * 24;
   const mm = mountainMask(x, z);
   let mount = 0;
-  if (mm > 0) { const r = 1 - Math.abs(fbm(x * 0.0026 + 3.1, z * 0.0026 + 9.4, 3)); mount = mm * r * r * r * 95; }
+  if (mm > 0) { const r = 1 - Math.abs(fbm(x * 0.0026 + 3.1, z * 0.0026 + 9.4, 3)); mount = mm * r * r * r * 95 * W.mount; }
   const des = desertness(x, z);
   let dunes = 0;
   if (des > 0) dunes = des * (Math.sin(x * 0.05 + z * 0.018 + noise(x * 0.008, z * 0.008) * 4) * 0.5 + 0.5) * 3.2;
   const bumps = noise(x * 0.07 + .5, z * 0.07 + .5) * 0.45;
-  let h = 6 + hills + mount + dunes + bumps, hs = 6 + hills + mount + dunes * 0.4;
+  let h = 6 + W.base + hills + mount + dunes + bumps, hs = 6 + W.base + hills + mount + dunes * 0.4;
   const d2 = x * x + z * z;
   let padK = 1;
-  if (d2 < 170 * 170) { padK = smooth(90, 170, Math.sqrt(d2)); h = lerp(9 + bumps * 0.4, h, padK); hs = lerp(9, hs, padK); }
+  if (d2 < 170 * 170) { padK = smooth(90, 170, Math.sqrt(d2)); h = lerp(9 + W.base + bumps * 0.4, h, padK); hs = lerp(9 + W.base, hs, padK); }
   // Grade the trail: drop the bumps and half the dunes, sink it a touch, fade it out where it fords a lake.
   const td = trailDistS(x, z, mount * padK), ad = Math.abs(td);
   lastTrailD = td;
@@ -98,7 +116,7 @@ function getChunkData(cx, cz) {
   const x0 = cx * CS, z0 = cz * CS;
   const inChunk = (x, z) => x >= x0 && x < x0 + CS && z >= z0 && z < z0 + CS;
   PRESET_RAMPS.forEach(p => { if (inChunk(p[0], p[1])) d.ramps.push(makeRamp(...p)); });
-  PRESET_FLAGS.forEach((p, i) => { if (inChunk(p[0], p[1])) d.flags.push({ id: 'p' + i, x: p[0], z: p[1], y: terrainH(p[0], p[1]) }); });
+  PRESET_FLAGS.forEach((p, i) => { if (inChunk(p[0], p[1])) d.flags.push({ id: flagPrefix() + 'p' + i, x: p[0], z: p[1], y: terrainH(p[0], p[1]) }); });
   for (let i = 0; i < 2; i++) {
     const roll = rng(), x = x0 + 15 + rng() * (CS - 30), z = z0 + 15 + rng() * (CS - 30), a = rng() * TAU, L = 9 + rng() * 6, W = 4 + rng() * 1.5, H = 1.6 + rng() * 2.4;
     if (roll > 0.38 || Math.hypot(x, z) < 110) continue;
@@ -108,15 +126,16 @@ function getChunkData(cx, cz) {
   }
   const nearRamp = (x, z) => d.ramps.some(r => (x - r.x) ** 2 + (z - r.z) ** 2 < (r.L * 0.75 + 3) ** 2) ||
     PRESET_RAMPS.some(p => (x - p[0]) ** 2 + (z - p[1]) ** 2 < 144);
-  for (let i = 0; i < 120; i++) {
+  const treeTries = Math.round(W.trees * (coarse ? 0.7 : 1));
+  for (let i = 0; i < treeTries; i++) {
     const x = x0 + rng() * CS, z = z0 + rng() * CS, r = rng(), s = rng(), rot = rng(), tint = rng();
     if (x * x + z * z < 45 * 45 || nearRamp(x, z)) continue;
     const h = rawHeight(x, z);
     if (Math.abs(lastTrailD) < 5.5) continue;
-    if (h < WATER + 1.4 || h > 64 || slopeAt(x, z) > 0.6) continue;
+    if (h < WATER + 1.4 || h > W.treeLine || slopeAt(x, z) > 0.6) continue;
     const des = desertness(x, z);
     if (des > 0.55) {
-      if (r < 0.07) { const sc = 0.8 + s * 0.6; const o = { x, z, y: terrainH(x, z) - 0.1, s: sc, rot, tint }; d.cacti.push(o); d.obs.push({ x, z, y: o.y, r: 0.42 * sc, top: 3.2 * sc, kind: 'cactus' }); }
+      if (r < (W.desert === 1 ? 0.11 : 0.07)) { const sc = 0.8 + s * 0.6; const o = { x, z, y: terrainH(x, z) - 0.1, s: sc, rot, tint }; d.cacti.push(o); d.obs.push({ x, z, y: o.y, r: 0.42 * sc, top: 3.2 * sc, kind: 'cactus' }); }
     } else if (r < forestness(x, z) * 0.75 + 0.025) {
       const oak = tint < 0.42 && h < 32;
       const sc = oak ? 0.85 + s * 0.5 : 0.8 + s * 0.7;
@@ -140,18 +159,18 @@ function getChunkData(cx, cz) {
       const x = x0 + 10 + rng() * (CS - 20), z = z0 + 10 + rng() * (CS - 20);
       if (Math.hypot(x, z) < 130 || rawHeight(x, z) < WATER + 1 || nearRamp(x, z)) continue;
       if (d.obs.some(o => (o.x - x) ** 2 + (o.z - z) ** 2 < 25)) continue;
-      d.flags.push({ id: key + ':' + t, x, z, y: terrainH(x, z) });
+      d.flags.push({ id: flagPrefix() + key + ':' + t, x, z, y: terrainH(x, z) });
       break;
     }
   }
   // Decorative bushes use their own stream so they never shift flags or obstacles.
   const r2 = mulberry32(seed ^ 0xa5a5a5);
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0; i < W.bushes; i++) {
     const x = x0 + r2() * CS, z = z0 + r2() * CS, r = r2(), s = r2(), rot = r2(), tint = r2();
     if (x * x + z * z < 30 * 30 || nearRamp(x, z)) continue;
     const h = rawHeight(x, z);
     if (Math.abs(lastTrailD) < 4.5) continue;
-    if (h < WATER + 1.2 || h > 58 || desertness(x, z) > 0.45 || slopeAt(x, z) > 0.45) continue;
+    if (h < WATER + 1.2 || h > W.treeLine - 6 || desertness(x, z) > 0.45 || slopeAt(x, z) > 0.45) continue;
     if (r > 0.25 + forestness(x, z) * 0.5) continue;
     d.bushes.push({ x, z, y: terrainH(x, z) - 0.1, s: 0.6 + s * 0.9, sy: (0.6 + s * 0.9) * 0.75, rot, tint });
   }

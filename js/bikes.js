@@ -17,7 +17,16 @@ const BIKES = [
     scale: 1.05, top: 36, boostTop: 50, acc: 18, boostAcc: 28, turn: 0.9, air: 0.85, tough: 1.35 },
   { id: 'rally', name: 'Rally 500', num: '1', blurb: 'Built for flat-out desert stages. Heavy to throw around.',
     plastic: '#f1eee6', plastic2: '#d42b2b', jersey: '#d42b2b', accent: '#3a3d42', plateBg: '#f1eee6', plateInk: '#d42b2b', numInk: '#d42b2b',
-    scale: 1.1, top: 42, boostTop: 56, acc: 16, boostAcc: 26, turn: 0.78, air: 0.7, tough: 1.2, rally: true }
+    scale: 1.1, top: 42, boostTop: 56, acc: 16, boostAcc: 26, turn: 0.78, air: 0.7, tough: 1.2, rally: true },
+  { id: 'super', name: 'Supermoto 690', num: '69', blurb: 'Road-bred and brutal. Highest top speed, clumsy off a jump.',
+    plastic: '#1e1f23', plastic2: '#ffcf33', jersey: '#1e1f23', accent: '#ffcf33', plateBg: '#ffcf33', plateInk: '#15140f', numInk: '#ffcf33',
+    scale: 1.06, top: 46, boostTop: 60, acc: 17, boostAcc: 28, turn: 0.95, air: 0.75, tough: 1.0 },
+  { id: 'volt', name: 'Volt E-MX', num: 'E1', blurb: 'Electric. Instant torque off every corner, light in the air.',
+    plastic: '#e9f1f2', plastic2: '#1fb8b0', jersey: '#1fb8b0', accent: '#1fb8b0', plateBg: '#1fb8b0', plateInk: '#f4f1e8', numInk: '#0d5c58',
+    scale: 0.96, top: 33, boostTop: 47, acc: 21, boostAcc: 30, turn: 1.12, air: 1.2, tough: 0.95, electric: true },
+  { id: 'scrambler', name: 'Scrambler 74', num: '74', blurb: 'A 1970s classic. Gentle power, soft and forgiving.',
+    plastic: '#e8dcc0', plastic2: '#7a3b22', jersey: '#7a3b22', accent: '#d6dade', plateBg: '#f1eadb', plateInk: '#7a3b22', numInk: '#7a3b22',
+    scale: 1.02, top: 29, boostTop: 41, acc: 13, boostAcc: 21, turn: 1.05, air: 0.9, tough: 1.3, vintage: true }
 ];
 let bikeSpec = BIKES[0];
 // Per-bike colours that are not part of the handling spec.
@@ -25,7 +34,10 @@ const LOOKS = {
   trail:  { frame: '#2a2c31', pants: '#2c3a44', helmet: '#f4f1e8', lens: '#ff9a3c', rim: '#1d1d20' },
   pit:    { frame: '#c4c9ce', pants: '#2b2d6e', helmet: '#46b04a', lens: '#7ad8ff', rim: '#c4c9ce' },
   enduro: { frame: '#2f6fd6', pants: '#1f2f55', helmet: '#2f6fd6', lens: '#ffd84a', rim: '#d9a441' },
-  rally:  { frame: '#c4c9ce', pants: '#e9e5da', helmet: '#f1eee6', lens: '#ff5a3c', rim: '#1d1d20' }
+  rally:  { frame: '#c4c9ce', pants: '#e9e5da', helmet: '#f1eee6', lens: '#ff5a3c', rim: '#1d1d20' },
+  super:  { frame: '#c8323a', pants: '#1e1f23', helmet: '#ffcf33', lens: '#9a6bff', rim: '#ffcf33' },
+  volt:   { frame: '#2a2c31', pants: '#2a2c31', helmet: '#e9f1f2', lens: '#7ad8ff', rim: '#1fb8b0' },
+  scrambler: { frame: '#1d1d20', pants: '#3b4a5a', helmet: '#e8dcc0', lens: '#c7a24a', rim: '#d6dade' }
 };
 function plateTexture(spec, transparent) {
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 96;
@@ -132,7 +144,12 @@ function buildBike(spec) {
   tube(body, [[0, 1.0, 0.47], [0, 0.78, 0.43], [0.0, 0.52, 0.38], [0.04, 0.34, 0.32]], 0.026, frameMat);
   capsule(body, [0, 0.94, 0.5], [0, 1.1, 0.44], 0.04, 0.04, frameMat);
 
-  /* Engine: crankcase, finned barrel, covers. */
+  /* Engine: crankcase, finned barrel, covers. The electric bike gets a battery pack and motor instead. */
+  if (spec.electric) {
+    slab(body, [[-0.14, 0.32], [0.3, 0.3], [0.4, 0.5], [0.34, 0.8], [0.02, 0.84], [-0.14, 0.62]], 0.24, darkMetal, 0, 0.025);
+    for (const s of [-1, 1]) slab(body, [[-0.1, 0.36], [0.28, 0.34], [0.36, 0.5], [0.3, 0.76], [0.04, 0.78], [-0.1, 0.6]], 0.02, plastic2, s * 0.13, 0.006);
+    disc(body, 0.1, 0.16, alu, [0, 0.42, -0.08], 24);
+  } else {
   slab(body, [[-0.12, 0.33], [0.24, 0.3], [0.33, 0.42], [0.27, 0.57], [0.05, 0.62], [-0.12, 0.56]], 0.24, darkMetal);
   disc(body, 0.11, 0.05, mag, [0.135, 0.44, 0.06], 28);
   disc(body, 0.08, 0.04, mag, [-0.13, 0.46, 0.0], 24);
@@ -142,6 +159,7 @@ function buildBike(spec) {
     put(body, new THREE.CylinderGeometry(0.125, 0.125, 0.012, 20), alu, p, [-0.38, 0, 0]);
   }
   put(body, new THREE.BoxGeometry(0.2, 0.08, 0.18), darkMetal, [0, 0.84, 0.24], [-0.38, 0, 0]);
+  }
 
   /* Drivetrain: front and rear sprockets with the chain run between them. */
   disc(body, 0.045, 0.02, darkMetal, [-0.115, 0.43, -0.02], 16);
@@ -161,9 +179,16 @@ function buildBike(spec) {
   capsule(body, [0.06, 0.8, -0.18], [0.06, 0.86, -0.02], 0.03, 0.03, spring);
 
   /* Exhaust: header wraps the barrel and runs back into a silencer under the side panel. */
+  if (!spec.electric) {
   tube(body, [[0.04, 0.74, 0.27], [0.11, 0.64, 0.37], [0.16, 0.45, 0.32], [0.18, 0.4, 0.08], [0.18, 0.56, -0.2], [0.165, 0.74, -0.42]], 0.034, chrome, 48);
   capsule(body, [0.165, 0.74, -0.42], [0.165, 0.89, -0.92], 0.07, 0.06, alu);
   capsule(body, [0.165, 0.89, -0.92], [0.165, 0.9, -0.97], 0.045, 0.03, black);
+  }
+  if (spec.vintage) {
+    // Twin chrome pipes swept high along the side, plus a round headlamp.
+    tube(body, [[0.06, 0.74, 0.27], [0.15, 0.7, 0.3], [0.2, 0.86, 0.0], [0.2, 0.92, -0.5]], 0.03, chrome, 32);
+    capsule(body, [0.2, 0.92, -0.5], [0.2, 0.96, -0.86], 0.055, 0.05, chrome);
+  }
   if (spec.rally) {
     tube(body, [[-0.04, 0.74, 0.27], [-0.12, 0.6, 0.3], [-0.18, 0.5, 0.0], [-0.18, 0.6, -0.25], [-0.165, 0.74, -0.42]], 0.032, chrome, 40);
     capsule(body, [-0.165, 0.74, -0.42], [-0.165, 0.89, -0.92], 0.07, 0.06, alu);
@@ -210,7 +235,7 @@ function buildBike(spec) {
   const plateG = new THREE.Group(); plateG.position.set(0, 1.02, 0.03); plateG.rotation.x = -0.3; steer.add(plateG);
   slab(plateG, [[-0.15, -0.14], [0.15, -0.14], [0.16, 0.12], [0, 0.17], [-0.16, 0.12]], 0.025, plateMat, 0, 0.006).rotation.y = Math.PI / 2;
   put(plateG, new THREE.PlaneGeometry(0.2, 0.15), new THREE.MeshStandardMaterial({ map: plateTexture(spec), roughness: 0.4, polygonOffset: true, polygonOffsetFactor: -1 }), [0, 0, 0.02]);
-  if (spec.rally || spec.id === 'enduro') {
+  if (spec.rally || spec.vintage || spec.id === 'enduro' || spec.id === 'super') {
     put(steer, new THREE.CylinderGeometry(0.05, 0.055, 0.04, 18), new THREE.MeshStandardMaterial({ color: lin('#fff6d8'), emissive: lin('#fff1c2'), emissiveIntensity: 1.2, roughness: 0.1 }), [0, 0.98, 0.09], [Math.PI / 2 - 0.3, 0, 0]);
   }
   if (spec.rally) {
@@ -262,6 +287,7 @@ function setBike(id) {
   model = buildBike(bikeSpec);
   syncBike(0);
   document.querySelectorAll('.bike').forEach(e => e.setAttribute('aria-pressed', String(e.dataset.id === bikeSpec.id)));
+  $('bikeNote').textContent = bikeSpec.blurb;
   save();
 }
 function renderGarage() {
@@ -274,8 +300,46 @@ function renderGarage() {
     btn.setAttribute('aria-pressed', String(b.id === bikeSpec.id));
     btn.style.setProperty('--c', b.plastic); btn.style.setProperty('--n', b.numInk);
     btn.innerHTML = `<span class="swatch">${b.num}</span><span class="bname">${b.name}</span><span class="blurb">${b.blurb}</span>` +
-      `<span class="bars">${stat('Speed', b.top / 42)}${stat('Accel', (b.acc - 12) / 6)}${stat('Handling', b.turn / 1.3)}${stat('Air', b.air / 1.45)}</span>`;
+      `<span class="bars">${stat('Speed', b.top / 46)}${stat('Accel', (b.acc - 11) / 10)}${stat('Handling', b.turn / 1.3)}${stat('Air', b.air / 1.45)}</span>`;
     btn.addEventListener('click', () => setBike(b.id));
+    wrap.appendChild(btn);
+  }
+}
+
+/* ---------- Map picker ---------- */
+// Switching maps rebuilds everything the world generator made and sends the rider back to the start.
+function setWorld(id, initial) {
+  W = WORLDS.find(w => w.id === id) || WORLDS[0];
+  applyWorldLook();
+  document.querySelectorAll('.world').forEach(e => e.setAttribute('aria-pressed', String(e.dataset.id === W.id)));
+  const note = $('worldNote'); if (note) note.textContent = W.blurb;
+  if (initial) return;
+  dataCache.clear();
+  for (const k of [...chunks.keys()]) disposeChunk(k);
+  for (const t of grassTiles.values()) if (t.mesh) { scene.remove(t.mesh); t.mesh.dispose(); }
+  grassTiles.clear();
+  if (farMesh) { scene.remove(farMesh); farMesh.geometry.dispose(); farMesh = null; }
+  farRegion = null; farJob = null;
+  { const z = new THREE.Matrix4().makeScale(0, 0, 0); for (let i = 0; i < TRACKS; i++) trackMesh.setMatrixAt(i, z); trackMesh.instanceMatrix.needsUpdate = true; }
+  hist.length = 0;
+  bike.x = 0; bike.z = 5; bike.yaw = 0;
+  resetBike(false);
+  updateFar(true); updateChunks(true); updateGrass(true);
+  refreshMap(); findNearest();
+  camera.position.set(bike.x, bike.y + 3, bike.z - 7);
+  save();
+}
+function renderWorlds() {
+  const wrap = $('worlds');
+  wrap.textContent = '';
+  for (const w of WORLDS) {
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'world'; btn.dataset.id = w.id;
+    btn.setAttribute('aria-pressed', String(w.id === W.id));
+    btn.title = w.blurb;
+    btn.style.setProperty('--c', w.swatch); btn.style.setProperty('--sky', w.top);
+    btn.innerHTML = `<i></i><span>${w.name}</span>`;
+    btn.addEventListener('click', () => { if (w.id !== W.id) setWorld(w.id); });
     wrap.appendChild(btn);
   }
 }

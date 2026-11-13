@@ -44,15 +44,26 @@ sky.frustumCulled = false; sky.renderOrder = -1;
 scene.add(sky);
 
 // Image-based light from the same sky, so metal and plastic pick up the world around them.
-{
+function buildEnv() {
   const envScene = new THREE.Scene();
   const envSky = skyMat.clone(); envSky.toneMapped = false; envSky.uniforms.sunDisc.value = 4;
   envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), envSky));
   const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 24), new THREE.MeshBasicMaterial({ color: lin('#5f5b40'), toneMapped: false }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -3; envScene.add(ground);
   const pmrem = new THREE.PMREMGenerator(renderer);
+  if (scene.environment) scene.environment.dispose();
   scene.environment = pmrem.fromScene(envScene, 0.03).texture;
   pmrem.dispose();
+}
+buildEnv();
+// Repaint sky, fog and image lighting for the current map.
+function applyWorldLook() {
+  HORIZON.copy(lin(W.horizon));
+  scene.fog.density = W.fog;
+  skyMat.uniforms.top.value.copy(lin(W.top));
+  skyMat.uniforms.below.value.copy(lin(W.below));
+  skyMat.uniforms.sunCol.value.copy(lin(W.sun));
+  buildEnv();
 }
 
 scene.add(new THREE.HemisphereLight(lin('#d6e6f5'), lin('#5b4c33'), 0.3));
@@ -172,8 +183,8 @@ function terrainColor(h, ny, x, z, out, far, td = 99) {
   let grass = 1 - smooth(0.25, 0.6, des);
   const dirtT = smooth(0.95, 0.86, ny); mix3(COL.dirt, COL.duneB, des, tmpA); mix3(out, tmpA, dirtT, out); grass *= 1 - dirtT;
   const rockT = smooth(0.84, 0.72, ny); mix3(COL.rock, COL.rockB, nB, tmpA); mix3(out, tmpA, rockT, out); grass *= 1 - rockT;
-  const snowT = smooth(60, 72, h + nB * 6) * smooth(0.55, 0.75, ny); mix3(out, COL.snow, snowT, out); grass *= 1 - snowT;
-  if (far && h < 64) mix3(out, COL.forest, forestness(x, z) * grass * 0.75, out);
+  const snowT = smooth(W.snowLine, W.snowLine + 12, h + nB * 6) * smooth(0.55, 0.75, ny); mix3(out, COL.snow, snowT, out); grass *= 1 - snowT;
+  if (far && h < W.treeLine) mix3(out, COL.forest, forestness(x, z) * grass * 0.75, out);
   const shoreT = smooth(WATER + 2.0, WATER + 0.6, h); mix3(COL.sand, COL.dune, des, tmpA); mix3(out, tmpA, shoreT, out); grass *= 1 - shoreT;
   mix3(out, COL.wet, smooth(WATER + 0.5, WATER - 0.3, h), out);
   mix3(out, COL.bed, smooth(WATER - 0.3, WATER - 2.5, h), out);

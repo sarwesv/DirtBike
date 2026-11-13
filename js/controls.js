@@ -5,9 +5,9 @@
 
 /* ---------- Persistence ---------- */
 const SAVE_KEY = 'ridgeline-moto-v1';
-let best = 0, collected = new Set(), odo = 0, savedBike = 'trail';
-try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}'); best = s.best || 0; collected = new Set(s.flags || []); odo = s.odo || 0; savedBike = s.bike || 'trail'; } catch (e) {}
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ best, flags: [...collected], odo, bike: bikeSpec.id })); } catch (e) {} }
+let best = 0, collected = new Set(), odo = 0, savedBike = 'trail', savedWorld = 'open';
+try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}'); best = s.best || 0; collected = new Set(s.flags || []); odo = s.odo || 0; savedBike = s.bike || 'trail'; savedWorld = s.world || 'open'; } catch (e) {}
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ best, flags: [...collected], odo, bike: bikeSpec.id, world: W.id })); } catch (e) {} }
 
 /* ---------- Bike state & input ---------- */
 const bike = { x: 0, y: 9, z: 5, yaw: 0, speed: 0, vy: 0, vx: 0, vz: 0, pitch: 0, pitchVel: 0, yawVel: 0, lean: 0, steer: 0, wheelie: 0, grounded: true, air: 0, flip: 0, spin: 0, crashed: false, crashT: 0, crashSpin: 0, roll: 0, nitro: 0.6, wheelieT: 0, susp: 0, spinW: 0 };

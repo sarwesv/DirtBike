@@ -60,6 +60,8 @@ function frame(now) {
 
 function start(data) {
   renderGarage();
+  setWorld((data && data.world) || savedWorld, true);
+  renderWorlds();
   setBike((data && data.bike) || savedBike);
   if (data && typeof data.x === 'number') {
     refreshNearRamps(data.x, data.z);
@@ -79,5 +81,5 @@ function start(data) {
   if ((data && data.playing) || location.hash === '#ride') { state = 'play'; titleEl.hidden = true; hud.hidden = false; }
   requestAnimationFrame(t => { last = t; frame(t); });
 }
-try { window.claude?.hot?.snapshot?.(() => ({ x: bike.x, z: bike.z, yaw: bike.yaw, score, camMode, bike: bikeSpec.id, playing: state === 'play' })); } catch (e) {}
+try { window.claude?.hot?.snapshot?.(() => ({ x: bike.x, z: bike.z, yaw: bike.yaw, score, camMode, bike: bikeSpec.id, world: W.id, playing: state === 'play' })); } catch (e) {}
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
