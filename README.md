@@ -27,6 +27,7 @@ js/physics.js       riding, jumps, tricks, landings, crashes, flags
 js/view.js          bike model sync and chase camera
 js/minimap.js       heading-up minimap
 js/hud.js           speedometer, gears, surface and score readouts
+js/post.js          bloom, colour grade, vignette (desktop only)
 js/main.js          resize, adaptive quality, frame loop and start-up
 ```
 

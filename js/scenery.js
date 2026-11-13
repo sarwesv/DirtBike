@@ -58,6 +58,24 @@ const CACTUS = mergeParts([
 ]);
 const ROCK = mergeParts([[lumpy(new THREE.DodecahedronGeometry(1, 1), 0.4, 8), '#8d867b', mtx(0, 0, 0)]]);
 const instMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0, envMapIntensity: 0.7 });
+// Trees and bushes lean with the same gusts as the grass; the trunk base stays planted.
+instMat.onBeforeCompile = sh => {
+  sh.uniforms.uTime = grassU.uTime;
+  sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <project_vertex>', [
+    'vec4 mvPosition = vec4(transformed, 1.0);',
+    '#ifdef USE_INSTANCING',
+    'mvPosition = instanceMatrix * mvPosition;',
+    'vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);',
+    'float hgt = max(mvPosition.y - ip.y, 0.0);',
+    'float bend = hgt * hgt * 0.0035;',
+    'float gust = sin(uTime * 0.7 + ip.x * 0.03) * 0.5 + 0.7;',
+    'mvPosition.x += (sin(uTime * 1.3 + ip.x * 0.11 + ip.z * 0.07) * 0.6 + 0.4) * bend * gust;',
+    'mvPosition.z += cos(uTime * 1.1 + ip.z * 0.13) * 0.4 * bend * gust;',
+    '#endif',
+    'mvPosition = modelViewMatrix * mvPosition;',
+    'gl_Position = projectionMatrix * mvPosition;'
+  ].join('\n'));
+};
 const rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, map: detailTex, envMapIntensity: 0.7 });
 rockMat.onBeforeCompile = detailOnly;
 ROCK.setAttribute('uv', new THREE.Float32BufferAttribute(Array.from(ROCK.attributes.position.array).filter((_, i) => i % 3 !== 1).map(v => v * 0.6), 2));

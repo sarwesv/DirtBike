@@ -11,6 +11,7 @@ function resize() {
   // Keep roughly a 70 degree horizontal view, so an upright phone still sees the trail ahead.
   baseFov = camera.aspect < 1 ? clamp(2 * Math.atan(Math.tan(35 * Math.PI / 180) / camera.aspect) * 180 / Math.PI, 66, 92) : 66;
   camera.fov = baseFov; camera.updateProjectionMatrix();
+  if (post) post.resize();
 }
 // Drop render resolution step by step when the frame rate sags (never raises it, to avoid flicker).
 let dpr = renderer.getPixelRatio(), fpsT = 0, fpsN = 0;
@@ -53,7 +54,7 @@ function frame(now) {
   if (mapT <= 0 || Math.hypot(bike.x - mapCx, bike.z - mapCz) > 24) { mapT = 0.4; refreshMap(); }
   if (state === 'play') { drawMap(); updHud(); }
   else updAudio(0.1, 0);
-  renderer.render(scene, camera);
+  renderFrame();
   requestAnimationFrame(frame);
 }
 
