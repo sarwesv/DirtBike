@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#14160f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Ridgeline Moto</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -88,33 +91,83 @@ body {
 #bail.show { animation: pop 2s ease-out forwards; }
 @keyframes pop { 0% { opacity: 0; transform: translateY(12px) scale(.9); } 10% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
 
-/* Touch pads */
+/* Touch controls */
 #touch { display: none; }
+.steer, .pads { position: absolute; bottom: calc(var(--edge) + env(safe-area-inset-bottom, 0px)); pointer-events: auto; touch-action: none; -webkit-touch-callout: none; }
+.steer {
+  left: calc(var(--edge) + env(safe-area-inset-left, 0px)); width: clamp(150px, 30vw, 230px); height: 84px; border-radius: 42px;
+  background: var(--panel); border: 2px solid var(--line); display: flex; align-items: center; justify-content: space-between;
+  padding-inline: 14px; color: var(--muted); font-size: 16px; backdrop-filter: blur(6px);
+}
+.knob { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; margin: -31px 0 0 -31px; border-radius: 50%; background: var(--text); box-shadow: 0 4px 12px rgba(0,0,0,.45); transition: transform .14s ease-out; }
+.steer.active .knob { transition: none; background: var(--plate); }
+.pads { right: calc(var(--edge) + env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: auto auto; grid-template-areas: "lean boost" "down up"; gap: 10px; align-items: end; justify-items: center; }
+.pads button {
+  width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--line); background: var(--panel); color: var(--text);
+  font: 700 13px/1 var(--font-ui); letter-spacing: .06em; text-transform: uppercase; touch-action: none; -webkit-user-select: none; user-select: none; backdrop-filter: blur(6px);
+}
+.pads [data-k="up"] { grid-area: up; width: 86px; height: 86px; background: var(--plate); color: var(--plate-ink); font-size: 15px; }
+.pads [data-k="down"] { grid-area: down; width: 70px; height: 70px; }
+.pads [data-k="lean"] { grid-area: lean; width: 54px; height: 54px; font-size: 10px; }
+.pads [data-k="boost"] { grid-area: boost; width: 54px; height: 54px; font-size: 10px; color: #b6f0ff; }
+.pads button.on { filter: brightness(1.35); transform: scale(.95); }
 @media (pointer: coarse) {
   #touch { display: block; }
   .keys { display: none; }
-  .gauge { right: 50%; transform: translateX(50%); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding: 6px 12px 8px; }
+  .gauge { right: 50%; transform: translateX(50%); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding: 6px 12px 8px; gap: 2px 12px; }
   #speed { font-size: 38px; }
-  .map { width: 112px; height: 112px; }
-  #score { font-size: 26px; }
+  .bar { min-width: 90px; }
 }
-.pad { position: absolute; bottom: calc(var(--edge) + env(safe-area-inset-bottom, 0px)); display: flex; gap: 10px; pointer-events: auto; }
-.pad.left { left: calc(var(--edge) + env(safe-area-inset-left, 0px)); }
-.pad.right { right: calc(var(--edge) + env(safe-area-inset-right, 0px)); flex-wrap: wrap; width: 170px; justify-content: flex-end; }
-.pad button {
-  width: 74px; height: 74px; border-radius: 50%; border: 2px solid var(--line); background: var(--panel); color: var(--text);
-  font: 700 14px/1 var(--font-ui); letter-spacing: .06em; text-transform: uppercase; touch-action: none;
+@media (pointer: coarse) and (orientation: portrait) {
+  .gauge { bottom: calc(176px + env(safe-area-inset-bottom, 0px)); }
 }
-.pad button.sm { width: 56px; height: 56px; font-size: 11px; }
-.pad button.gas { background: var(--plate); color: var(--plate-ink); }
-.pad button.on { filter: brightness(1.4); transform: scale(.96); }
+/* Compact HUD for phones and small windows */
+@media (max-width: 720px), (max-height: 520px) {
+  :root { --edge: 10px; }
+  .tl, .tr { gap: 6px; }
+  .plate { padding: 4px 10px 3px; }
+  #score { font-size: 24px; }
+  .stats { gap: 10px; padding: 4px 8px; }
+  .stats b { font-size: 16px; }
+  .stats div:last-child { display: none; }
+  .map { width: 100px; height: 100px; }
+  #flagDist { font-size: 12px; padding: 2px 7px; }
+  .tools button { padding: 6px 8px; font-size: 11px; }
+  .keys { display: none; }
+  #air { top: 12%; font-size: 16px; }
+  #trick { top: 20%; }
+}
+@media (max-width: 420px) {
+  .tools { flex-wrap: wrap; justify-content: flex-end; max-width: 160px; }
+  .map { width: 88px; height: 88px; }
+}
 
 /* Title / pause */
 #title {
-  position: fixed; inset: 0; display: grid; place-items: center; padding-inline: var(--edge);
+  position: fixed; inset: 0; overflow-y: auto; overflow-x: hidden; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; touch-action: pan-x pan-y;
+  padding-inline: calc(var(--edge) + env(safe-area-inset-left, 0px)) calc(var(--edge) + env(safe-area-inset-right, 0px));
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
   background: linear-gradient(180deg, rgba(20,22,15,.15) 0%, rgba(20,22,15,.55) 55%, rgba(20,22,15,.88) 100%);
 }
-.card { width: min(560px, 100%); display: flex; flex-direction: column; gap: 18px; padding-block: 24px; }
+.card { width: min(1060px, 100%); display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 24px 44px; align-items: center; padding-block: 12px; }
+.intro { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.garage { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.garage h2 { margin: 0; }
+.bikes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.bike {
+  text-align: left; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "sw name" "sw blurb" "bars bars"; gap: 2px 10px;
+  padding: 10px 12px 12px; background: var(--panel); border: 2px solid var(--line); border-radius: 12px; color: var(--text);
+  font-family: var(--font-ui); cursor: pointer; backdrop-filter: blur(6px); min-width: 0;
+}
+.bike:hover { border-color: rgba(243,239,228,.4); }
+.bike[aria-pressed="true"] { border-color: var(--plate); box-shadow: 0 0 0 1px var(--plate), 0 8px 22px rgba(0,0,0,.35); }
+.bike:focus-visible { outline: 2px solid var(--plate); outline-offset: 2px; }
+.swatch { grid-area: sw; width: 46px; height: 40px; border-radius: 7px 7px 13px 13px; background: var(--c); color: var(--n); display: grid; place-items: center; font-weight: 700; font-size: 19px; box-shadow: inset 0 0 0 2px rgba(0,0,0,.2); }
+.bname { grid-area: name; font-weight: 700; font-size: 17px; align-self: end; }
+.blurb { grid-area: blurb; font-size: 13px; color: var(--muted); line-height: 1.3; }
+.bars { grid-area: bars; display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; align-items: center; margin-top: 8px; }
+.bars span { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.bars i { height: 5px; border-radius: 3px; background: linear-gradient(90deg, var(--plate) calc(var(--v) * 100%), rgba(243,239,228,.12) 0); }
 .card h1 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(46px, 11vw, 92px); line-height: .9; color: var(--plate); text-shadow: 0 5px 0 rgba(0,0,0,.4); text-wrap: balance; }
 .card p { margin: 0; font-size: 18px; line-height: 1.4; max-width: 46ch; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
 .controls { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; backdrop-filter: blur(6px); }
@@ -131,7 +184,26 @@ body {
 .tip { font-size: 14px; color: var(--muted); }
 .touch-note { display: none; }
 @media (pointer: coarse) { .controls { display: none; } .touch-note { display: block; } }
-@media (max-height: 560px) { .controls { display: none; } .card { gap: 12px; } }
+@media (max-width: 860px) {
+  .card { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .bikes { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; }
+  .bike { flex: 0 0 min(230px, 72vw); scroll-snap-align: start; }
+}
+@media (max-height: 560px) { .controls { display: none; } }
+@media (max-height: 560px) and (min-width: 600px) {
+  .card { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 24px; align-items: center; }
+  .intro { gap: 10px; }
+  .card h1 { font-size: clamp(34px, 9vh, 56px); }
+  .card p { font-size: 15px; }
+  .bikes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
+  .bike { padding: 8px 10px; }
+  .blurb { display: none; }
+  .bars { margin-top: 4px; gap: 2px 8px; }
+  .cta { padding: 11px 26px; font-size: 18px; }
+  .row .tip { display: none; }
+}
+.portrait-hint { display: none; }
+@media (pointer: coarse) and (orientation: portrait) { .portrait-hint { display: block; } }
 @media (prefers-reduced-motion: reduce) { #trick.show, #bail.show { animation-duration: 2.4s; } }
 </style>
 
@@ -152,6 +224,7 @@ body {
     <div class="tools">
       <button id="btnCam" type="button">Camera</button>
       <button id="btnSound" type="button">Sound on</button>
+      <button id="btnFull" type="button">Full screen</button>
       <button id="btnPause" type="button">Pause</button>
     </div>
   </div>
@@ -165,18 +238,19 @@ body {
   <div id="trick" class="center"></div>
   <div id="bail" class="center"></div>
   <div id="touch">
-    <div class="pad left"><button type="button" data-k="left" aria-label="Steer left">◀</button><button type="button" data-k="right" aria-label="Steer right">▶</button></div>
-    <div class="pad right">
-      <button type="button" class="sm" data-k="lean">Wheelie</button>
-      <button type="button" class="sm" data-k="boost">Nitro</button>
+    <div class="steer" id="steerPad" role="slider" aria-label="Steering" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0"><span>◀</span><span>▶</span><i class="knob"></i></div>
+    <div class="pads">
+      <button type="button" data-k="lean">Wheelie</button>
+      <button type="button" data-k="boost">Nitro</button>
       <button type="button" data-k="down">Brake</button>
-      <button type="button" class="gas" data-k="up">Gas</button>
+      <button type="button" data-k="up">Gas</button>
     </div>
   </div>
 </div>
 
 <div id="title">
   <div class="card">
+   <div class="intro">
     <h1 id="titleHead">Ridgeline Moto</h1>
     <p id="titleSub">Open country with no fences. Ride anywhere, launch the kickers, and hunt down the gold flags glowing on the horizon.</p>
     <div class="controls">
@@ -187,11 +261,17 @@ body {
       <kbd>Shift</kbd><span><em>Nitro</em>, refilled by tricks and flags</span>
       <kbd>R · C · M · Esc</kbd><span>Reset bike · camera · sound · pause</span>
     </div>
-    <p class="touch-note tip">Steer with the left pads. Gas, brake, wheelie and nitro are on the right. In the air, gas and brake flip the bike.</p>
+    <p class="touch-note tip">Slide your thumb on the left pad to steer. Gas, brake, wheelie and nitro are on the right. In the air, gas and brake flip the bike and the steering pad spins it.</p>
+    <p class="portrait-hint tip">Turn your phone sideways for the widest view.</p>
     <div class="row">
       <button id="btnRide" class="cta" type="button">Ride</button>
       <span class="tip">Land with both wheels square to the ground.<br>Flips and 360s score big and refill nitro.</span>
     </div>
+   </div>
+   <section class="garage" aria-label="Choose your bike">
+    <h2 class="k">Garage · pick a bike</h2>
+    <div class="bikes" id="bikes"></div>
+   </section>
   </div>
 </div>
 
@@ -888,22 +968,37 @@ function updClouds() {
 
 /* ---------- Bike model ---------- */
 const R_WHEEL = 0.36;
-function plateTexture() {
+const BIKES = [
+  { id: 'trail', name: 'Trail 250', num: '27', blurb: 'The all-rounder. Forgiving landings, steady in the air.',
+    plastic: '#f2642a', plastic2: '#f2642a', jersey: '#23596a', accent: '#d9a441', plateBg: '#ffcf33', plateInk: '#15140f', numInk: '#15140f',
+    scale: 1, top: 31, boostTop: 44, acc: 15, boostAcc: 24, turn: 1, air: 1, tough: 1 },
+  { id: 'pit', name: 'Pit 125', num: '7', blurb: 'Tiny and twitchy. Flips and spins fastest, runs out of puff early.',
+    plastic: '#46b04a', plastic2: '#2d2f33', jersey: '#2b2d6e', accent: '#c4c9ce', plateBg: '#f4f1e8', plateInk: '#15140f', numInk: '#0f2a10',
+    scale: 0.82, top: 24, boostTop: 34, acc: 17, boostAcc: 26, turn: 1.3, air: 1.45, tough: 0.85 },
+  { id: 'enduro', name: 'Enduro 450', num: '45', blurb: 'Torquey and planted. Shrugs off hard landings.',
+    plastic: '#2f6fd6', plastic2: '#f4f1e8', jersey: '#ece7da', accent: '#d9a441', plateBg: '#f4f1e8', plateInk: '#1d3f86', numInk: '#ffffff',
+    scale: 1.05, top: 36, boostTop: 50, acc: 18, boostAcc: 28, turn: 0.9, air: 0.85, tough: 1.35 },
+  { id: 'rally', name: 'Rally 500', num: '1', blurb: 'Built for flat-out desert stages. Heavy to throw around.',
+    plastic: '#f1eee6', plastic2: '#d42b2b', jersey: '#d42b2b', accent: '#3a3d42', plateBg: '#f1eee6', plateInk: '#d42b2b', numInk: '#d42b2b',
+    scale: 1.1, top: 42, boostTop: 56, acc: 16, boostAcc: 26, turn: 0.78, air: 0.7, tough: 1.2, rally: true }
+];
+let bikeSpec = BIKES[0];
+function plateTexture(spec) {
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 96;
   const x = cv.getContext('2d');
-  x.fillStyle = '#ffcf33'; x.fillRect(0, 0, 128, 96);
-  x.fillStyle = '#15140f'; x.font = '700 72px "Barlow Semi Condensed", "Arial Narrow", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillText('27', 64, 52);
+  x.fillStyle = spec.plateBg; x.fillRect(0, 0, 128, 96);
+  x.fillStyle = spec.plateInk; x.font = '700 72px "Barlow Semi Condensed", "Arial Narrow", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(spec.num, 64, 52);
   const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; return t;
 }
-function buildBike() {
+function buildBike(spec) {
   const root = new THREE.Group();
   const wheelie = new THREE.Group(); wheelie.position.set(0, 0, -0.72); root.add(wheelie);
   const body = new THREE.Group(); body.position.set(0, 0, 0.72); wheelie.add(body);
   const steer = new THREE.Group(); steer.position.set(0, 0, 0.6); body.add(steer);
   const M = (c, rough = 0.55, metal = 0) => new THREE.MeshStandardMaterial({ color: lin(c), roughness: rough, metalness: metal });
-  const plastic = M('#f2642a', 0.32), black = M('#1c1c1f', 0.9), metal = M('#c4c9ce', 0.28, 0.9), alu = M('#9aa1a8', 0.4, 0.85), seat = M('#2b2b30', 0.7),
-    jersey = M('#23596a', 0.8), pants = M('#d3cdbd', 0.8), boot = M('#26262a', 0.6), helmet = M('#f4f1e8', 0.25), visor = M('#141518', 0.1, 0.4), gold = M('#d9a441', 0.3, 0.9);
+  const plastic = M(spec.plastic, 0.32), plastic2 = M(spec.plastic2, 0.32), black = M('#1c1c1f', 0.9), metal = M('#c4c9ce', 0.28, 0.9), alu = M('#9aa1a8', 0.4, 0.85), seat = M('#2b2b30', 0.7),
+    jersey = M(spec.jersey, 0.8), pants = M('#d3cdbd', 0.8), boot = M('#26262a', 0.6), helmet = M('#f4f1e8', 0.25), visor = M('#141518', 0.1, 0.4), gold = M(spec.accent, 0.3, 0.9);
   const add = (parent, geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); parent.add(m); return m; };
   const Y = new THREE.Vector3(0, 1, 0);
   const limb = (parent, a, b, t, mat, round) => {
@@ -930,10 +1025,10 @@ function buildBike() {
   limb(body, [0, 0.5, 0.2], [0, 0.98, 0.5], 0.07, metal, true);
   limb(body, [0, 0.62, -0.15], [0, 0.98, 0.5], 0.06, metal, true);
   add(body, new THREE.BoxGeometry(0.34, 0.2, 0.44), plastic, 0, 0.92, 0.2, 0.12);
-  add(body, new THREE.BoxGeometry(0.42, 0.16, 0.22), plastic, 0, 0.9, 0.36, 0.3);
+  add(body, new THREE.BoxGeometry(0.42, 0.16, 0.22), plastic2, 0, 0.9, 0.36, 0.3);
   add(body, new THREE.BoxGeometry(0.26, 0.08, 0.78), seat, 0, 0.93, -0.3, 0.04);
   add(body, new THREE.BoxGeometry(0.3, 0.07, 0.62), plastic, 0, 0.92, -0.76, 0.26);
-  add(body, new THREE.BoxGeometry(0.32, 0.22, 0.3), plastic, 0, 0.78, -0.42);
+  add(body, new THREE.BoxGeometry(0.32, 0.22, 0.3), plastic2, 0, 0.78, -0.42);
   for (const s of [-1, 1]) limb(body, [s * 0.1, R_WHEEL, -0.72], [s * 0.1, 0.5, -0.05], 0.06, alu);
   limb(body, [0, 0.55, -0.32], [0, 0.88, -0.2], 0.06, gold, true);
   limb(body, [0.15, 0.62, -0.05], [0.17, 0.8, -0.78], 0.09, metal, true);
@@ -942,7 +1037,7 @@ function buildBike() {
   add(steer, new THREE.BoxGeometry(0.16, 0.04, 0.5), plastic, 0, 0.8, 0.2, -0.12);
   add(steer, new THREE.CylinderGeometry(0.018, 0.018, 0.72, 8), black, 0, 1.1, -0.12, 0, 0, Math.PI / 2);
   for (const s of [-1, 1]) add(steer, new THREE.CylinderGeometry(0.025, 0.025, 0.12, 8), black, s * 0.32, 1.1, -0.12, 0, 0, Math.PI / 2);
-  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.24, 0.03), new THREE.MeshStandardMaterial({ map: plateTexture(), roughness: 0.5 }));
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.24, 0.03), new THREE.MeshStandardMaterial({ map: plateTexture(spec), roughness: 0.5 }));
   plate.position.set(0, 1.0, 0.02); plate.rotation.x = -0.35; steer.add(plate);
   // Rider
   for (const s of [-1, 1]) {
@@ -957,12 +1052,45 @@ function buildBike() {
   add(head, new THREE.BoxGeometry(0.2, 0.08, 0.14), plastic, 0, -0.08, 0.13);
   add(head, new THREE.BoxGeometry(0.24, 0.03, 0.16), plastic, 0, 0.1, 0.17, -0.2);
   add(head, new THREE.BoxGeometry(0.22, 0.07, 0.04), visor, 0, 0.02, 0.16);
+  if (spec.rally) {
+    add(steer, new THREE.BoxGeometry(0.36, 0.3, 0.03), new THREE.MeshStandardMaterial({ color: lin('#26303a'), roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.6 }), 0, 1.3, -0.02, -0.45);
+    add(body, new THREE.BoxGeometry(0.48, 0.26, 0.52), plastic2, 0, 0.86, 0.22, 0.1);
+    add(body, new THREE.BoxGeometry(0.14, 0.1, 0.16), black, 0, 1.18, 0.44, -0.3);
+    limb(body, [-0.17, 0.82, -0.72], [-0.17, 0.86, -0.95], 0.08, metal, true);
+  }
+  root.scale.setScalar(spec.scale);
+  root.rotation.order = 'YXZ';
   root.traverse(o => { if (o.isMesh) o.castShadow = true; });
   scene.add(root);
   return { root, wheelie, steer, rear, front };
 }
-const model = buildBike();
-model.root.rotation.order = 'YXZ';
+let model = null;
+function setBike(id) {
+  bikeSpec = BIKES.find(b => b.id === id) || BIKES[0];
+  if (model) {
+    scene.remove(model.root);
+    model.root.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+  }
+  model = buildBike(bikeSpec);
+  syncBike(0);
+  document.querySelectorAll('.bike').forEach(e => e.setAttribute('aria-pressed', String(e.dataset.id === bikeSpec.id)));
+  save();
+}
+function renderGarage() {
+  const wrap = $('bikes');
+  wrap.textContent = '';
+  const stat = (label, v) => `<span>${label}</span><i style="--v:${clamp(v, 0.08, 1).toFixed(2)}"></i>`;
+  for (const b of BIKES) {
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'bike'; btn.dataset.id = b.id;
+    btn.setAttribute('aria-pressed', String(b.id === bikeSpec.id));
+    btn.style.setProperty('--c', b.plastic); btn.style.setProperty('--n', b.numInk);
+    btn.innerHTML = `<span class="swatch">${b.num}</span><span class="bname">${b.name}</span><span class="blurb">${b.blurb}</span>` +
+      `<span class="bars">${stat('Speed', b.top / 42)}${stat('Accel', (b.acc - 12) / 6)}${stat('Handling', b.turn / 1.3)}${stat('Air', b.air / 1.45)}</span>`;
+    btn.addEventListener('click', () => setBike(b.id));
+    wrap.appendChild(btn);
+  }
+}
 
 /* ---------- Tyre tracks ---------- */
 const TRACKS = 700;
@@ -1060,9 +1188,9 @@ function updAudio(rpm, thr) {
 
 /* ---------- Persistence ---------- */
 const SAVE_KEY = 'ridgeline-moto-v1';
-let best = 0, collected = new Set(), odo = 0;
-try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}'); best = s.best || 0; collected = new Set(s.flags || []); odo = s.odo || 0; } catch (e) {}
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ best, flags: [...collected], odo })); } catch (e) {} }
+let best = 0, collected = new Set(), odo = 0, savedBike = 'trail';
+try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}'); best = s.best || 0; collected = new Set(s.flags || []); odo = s.odo || 0; savedBike = s.bike || 'trail'; } catch (e) {}
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ best, flags: [...collected], odo, bike: bikeSpec.id })); } catch (e) {} }
 
 /* ---------- Bike state & input ---------- */
 const bike = { x: 0, y: 9, z: 5, yaw: 0, speed: 0, vy: 0, vx: 0, vz: 0, pitch: 0, pitchVel: 0, yawVel: 0, lean: 0, steer: 0, wheelie: 0, grounded: true, air: 0, flip: 0, spin: 0, crashed: false, crashT: 0, crashSpin: 0, roll: 0, nitro: 0.6, wheelieT: 0, susp: 0, spinW: 0 };
@@ -1088,6 +1216,42 @@ document.querySelectorAll('#touch button').forEach(btn => {
   const off = () => { keys[k] = false; btn.classList.remove('on'); };
   btn.addEventListener('pointerdown', on); btn.addEventListener('pointerup', off); btn.addEventListener('pointercancel', off); btn.addEventListener('lostpointercapture', off);
 });
+
+// Analog thumb steering: slide anywhere on the pad, release to centre.
+let touchSteer = null;
+{
+  const pad = $('steerPad'), knob = pad.querySelector('.knob');
+  let pid = null;
+  const setV = v => {
+    touchSteer = v;
+    keys.left = v !== null && v < -0.35; keys.right = v !== null && v > 0.35;
+    knob.style.transform = v === null ? '' : `translateX(${(v * (pad.clientWidth / 2 - 38)).toFixed(1)}px)`;
+    pad.setAttribute('aria-valuenow', v === null ? '0' : v.toFixed(2));
+  };
+  const read = e => { const r = pad.getBoundingClientRect(); return clamp((e.clientX - (r.left + r.width / 2)) / (r.width / 2 - 30), -1, 1); };
+  pad.addEventListener('pointerdown', e => { e.preventDefault(); pid = e.pointerId; try { pad.setPointerCapture(pid); } catch (_) {} pad.classList.add('active'); setV(read(e)); initAudio(); });
+  pad.addEventListener('pointermove', e => { if (e.pointerId === pid) setV(read(e)); });
+  const end = e => { if (e.pointerId !== pid) return; pid = null; pad.classList.remove('active'); setV(null); };
+  pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end); pad.addEventListener('lostpointercapture', end);
+}
+$('touch').addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') togglePause(); });
+{
+  const btn = $('btnFull'), root = document.documentElement;
+  const req = root.requestFullscreen || root.webkitRequestFullscreen, exit = document.exitFullscreen || document.webkitExitFullscreen;
+  if (!req) btn.hidden = true;
+  btn.addEventListener('click', () => {
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) { const r = exit.call(document); if (r && r.catch) r.catch(() => {}); }
+      else {
+        const r = req.call(root);
+        if (r && r.then) r.then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => { btn.hidden = true; });
+      }
+    } catch (e) { btn.hidden = true; }
+  });
+  const sync = () => { btn.textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? 'Exit full screen' : 'Full screen'; };
+  document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync);
+}
 
 /* ---------- HUD ---------- */
 const hud = $('hud'), titleEl = $('title');
@@ -1157,7 +1321,7 @@ function land(g) {
   bike.y = g;
   if (bike.air > 0.2 && Math.abs(pDiff) > 0.8) return crash(pDiff > 0 ? 'Looped out and landed on the rear fender' : 'Nose-dived into the dirt');
   if (bike.air > 0.2 && hs > 4 && Math.abs(yawDiff) > 0.95) return crash('Landed sideways');
-  if (impact > 21) return crash('Cased it. That landing was too hard');
+  if (impact > 21 * bikeSpec.tough) return crash('Cased it. That landing was too hard');
   bike.grounded = true;
   bike.speed = hs * Math.cos(yawDiff) * (1 - clamp(impact * 0.012, 0, 0.3));
   bike.pitch = gp; bike.vy = 0; bike.pitchVel = 0;
@@ -1215,7 +1379,7 @@ function step(dt) {
     const sp = Math.abs(b.speed);
     const boosting = inp.boost && inp.up && b.nitro > 0.01 && b.speed > 0;
     let acc = 0;
-    if (inp.up) { const top = boosting ? 44 : 31; const f = b.speed > 0 ? 1 - Math.pow(clamp(b.speed / top, 0, 1), 2) : 1; acc += (boosting ? 24 : 15) * f; }
+    if (inp.up) { const top = boosting ? bikeSpec.boostTop : bikeSpec.top; const f = b.speed > 0 ? 1 - Math.pow(clamp(b.speed / top, 0, 1), 2) : 1; acc += (boosting ? bikeSpec.boostAcc : bikeSpec.acc) * f; }
     if (inp.down) { if (b.speed > 0.5) acc -= 20; else acc -= 7 * (1 - clamp(-b.speed / 6, 0, 1)); }
     acc -= G * Math.sin(slopeAng);
     acc -= b.speed * 0.18 + 0.0035 * b.speed * sp;
@@ -1224,9 +1388,9 @@ function step(dt) {
     if (!inp.up && !inp.down && Math.abs(b.speed) < 0.4 && Math.abs(slopeAng) < 0.35) b.speed = 0;
     if (boosting) b.nitro = Math.max(0, b.nitro - 0.22 * dt);
     b.boosting = boosting;
-    const st = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+    const st = touchSteer !== null ? touchSteer : (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
     b.steer = lerp(b.steer, st, damp(9, dt));
-    const turn = b.steer * 2.5 * clamp(sp / 4, 0, 1) / (1 + sp / 24);
+    const turn = b.steer * 2.5 * bikeSpec.turn * clamp(sp / 4, 0, 1) / (1 + sp / 24);
     b.yaw -= turn * dt * (b.speed < 0 ? -1 : 1);
     b.lean = lerp(b.lean, b.steer * clamp(sp / 14, 0, 1) * 0.6, damp(6, dt));
     b.wheelie = lerp(b.wheelie, inp.lean && b.speed > 2 ? 0.55 : 0, damp(inp.lean ? 3 : 6, dt));
@@ -1255,10 +1419,10 @@ function step(dt) {
     b.x += b.vx * dt; b.z += b.vz * dt; b.y += b.vy * dt;
     odo += Math.hypot(b.vx, b.vz) * dt;
     const pIn = (on('down') || on('lean') ? 1 : 0) - (on('up') ? 1 : 0);
-    b.pitchVel = clamp((b.pitchVel + pIn * 10 * dt) * Math.exp(-1.4 * dt), -7.5, 7.5);
+    b.pitchVel = clamp((b.pitchVel + pIn * 10 * bikeSpec.air * dt) * Math.exp(-1.4 * dt), -7.5 * bikeSpec.air, 7.5 * bikeSpec.air);
     b.pitch += b.pitchVel * dt; b.flip += b.pitchVel * dt;
     const yIn = (on('left') ? 1 : 0) - (on('right') ? 1 : 0);
-    b.yawVel = clamp((b.yawVel + yIn * 12 * dt) * Math.exp(-1.8 * dt), -9, 9);
+    b.yawVel = clamp((b.yawVel + yIn * 12 * bikeSpec.air * dt) * Math.exp(-1.8 * dt), -9 * bikeSpec.air, 9 * bikeSpec.air);
     b.yaw += b.yawVel * dt; b.spin += b.yawVel * dt;
     b.lean = lerp(b.lean, 0, damp(3, dt)); b.steer = lerp(b.steer, 0, damp(3, dt));
     b.boosting = false;
@@ -1283,8 +1447,9 @@ function syncBike(dt) {
   m.steer.rotation.y = -b.steer * 0.35;
   const target = b.grounded ? b.speed : (keys.up ? 30 : b.spinW * 0.98);
   b.spinW = b.grounded ? b.speed : lerp(b.spinW, target, damp(2, dt));
-  m.rear.rotation.x += b.spinW / R_WHEEL * dt;
-  m.front.rotation.x += (b.grounded ? b.speed : Math.hypot(b.vx, b.vz)) / R_WHEEL * dt;
+  const rw = R_WHEEL * bikeSpec.scale;
+  m.rear.rotation.x += b.spinW / rw * dt;
+  m.front.rotation.x += (b.grounded ? b.speed : Math.hypot(b.vx, b.vz)) / rw * dt;
 }
 let emitAcc = 0;
 function bikeParticles(dt) {
@@ -1329,7 +1494,7 @@ function updCamera(dt) {
   }
   shake = Math.max(0, shake - dt * 2);
   if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - 0.5) * shake * 0.3; camera.position.y += (Math.random() - 0.5) * shake * 0.3; }
-  const fov = 66 + (b.boosting ? 9 : 0) + clamp(Math.abs(b.speed) - 20, 0, 20) * 0.2;
+  const fov = baseFov + (b.boosting ? 9 : 0) + clamp(Math.abs(b.speed) - 20, 0, 20) * 0.2;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = lerp(camera.fov, fov, damp(3, dt)); camera.updateProjectionMatrix(); }
 }
 
@@ -1411,7 +1576,8 @@ const GEARS = [0, 7, 13, 19, 25, 32];
 function updHud() {
   const b = bike, hs = b.grounded ? Math.abs(b.speed) : Math.hypot(b.vx, b.vz);
   setText('speed', String(Math.round(hs * 3.6)));
-  let gear = 1; for (let i = 1; i < GEARS.length; i++) if (hs > GEARS[i]) gear = i + 1;
+  const gs = hs * 31 / bikeSpec.top;
+  let gear = 1; for (let i = 1; i < GEARS.length; i++) if (gs > GEARS[i]) gear = i + 1;
   gear = Math.min(gear, 5);
   setText('gear', b.speed < -0.5 && b.grounded ? 'R' : hs < 0.5 && !keys.up ? 'N' : String(gear));
   setText('score', score.toLocaleString());
@@ -1431,13 +1597,28 @@ function updHud() {
   else setText('flagDist', 'No flags within 1 km');
   let rpm, thr = keys.up ? 1 : 0;
   if (!b.grounded) rpm = keys.up ? 0.95 : 0.35;
-  else { const lo = GEARS[gear - 1], hi = GEARS[gear] || 44; rpm = hs < 0.5 ? (keys.up ? 0.5 : 0.12) : 0.22 + clamp((hs - lo) / (hi - lo), 0, 1) * 0.7; }
+  else { const lo = GEARS[gear - 1], hi = GEARS[gear] || 44; rpm = hs < 0.5 ? (keys.up ? 0.5 : 0.12) : 0.22 + clamp((gs - lo) / (hi - lo), 0, 1) * 0.7; }
   if (b.crashed) { rpm = 0.12; thr = 0; }
   updAudio(rpm, thr);
 }
 
 /* ---------- Loop ---------- */
-function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+let baseFov = 66;
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h;
+  // Keep roughly a 70 degree horizontal view, so an upright phone still sees the trail ahead.
+  baseFov = camera.aspect < 1 ? clamp(2 * Math.atan(Math.tan(35 * Math.PI / 180) / camera.aspect) * 180 / Math.PI, 66, 92) : 66;
+  camera.fov = baseFov; camera.updateProjectionMatrix();
+}
+// Drop render resolution step by step when the frame rate sags (never raises it, to avoid flicker).
+let dpr = renderer.getPixelRatio(), fpsT = 0, fpsN = 0;
+function adaptQuality(dt) {
+  fpsT += dt; fpsN++;
+  if (fpsT < 2.5) return;
+  const fps = fpsN / fpsT; fpsT = 0; fpsN = 0;
+  if (fps < 40 && dpr > 0.75) { dpr = Math.max(0.75, dpr - 0.25); renderer.setPixelRatio(dpr); resize(); }
+}
 addEventListener('resize', resize);
 let last = performance.now(), saveT = 0;
 function frame(now) {
@@ -1447,6 +1628,7 @@ function frame(now) {
     for (let i = 0; i < n; i++) step(dt / n);
     bikeParticles(dt);
     saveT += dt; if (saveT > 5) { saveT = 0; save(); }
+    adaptQuality(dt);
   }
   updateFar(false);
   updateChunks(false);
@@ -1475,6 +1657,8 @@ function frame(now) {
 }
 
 function start(data) {
+  renderGarage();
+  setBike((data && data.bike) || savedBike);
   if (data && typeof data.x === 'number') {
     refreshNearRamps(data.x, data.z);
     Object.assign(bike, { x: data.x, z: data.z, yaw: data.yaw || 0, y: groundH(data.x, data.z) });
@@ -1493,7 +1677,7 @@ function start(data) {
   if ((data && data.playing) || location.hash === '#ride') { state = 'play'; titleEl.hidden = true; hud.hidden = false; }
   requestAnimationFrame(t => { last = t; frame(t); });
 }
-try { window.claude?.hot?.snapshot?.(() => ({ x: bike.x, z: bike.z, yaw: bike.yaw, score, camMode, playing: state === 'play' })); } catch (e) {}
+try { window.claude?.hot?.snapshot?.(() => ({ x: bike.x, z: bike.z, yaw: bike.yaw, score, camMode, bike: bikeSpec.id, playing: state === 'play' })); } catch (e) {}
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
 </script>
