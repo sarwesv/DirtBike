@@ -72,6 +72,9 @@ body {
 #speed { font-size: 56px; font-weight: 700; line-height: .9; min-width: 3ch; text-align: right; }
 .unit { font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: .08em; }
 .nitro { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; }
+.surf { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 10px; }
+.surf b { font-size: 14px; font-weight: 700; }
+.surf b.trail { color: var(--plate); }
 .bar { flex: 1; height: 8px; border-radius: 4px; background: rgba(243,239,228,.12); overflow: hidden; min-width: 120px; }
 #nitro { display: block; height: 100%; width: 60%; background: linear-gradient(90deg, #4fc3ff, #b6f0ff); border-radius: 4px; }
 
@@ -232,6 +235,7 @@ body {
     <div class="gear"><span class="k">Gear</span><span id="gear">N</span></div>
     <div class="spd"><span id="speed">0</span><span class="unit">km/h</span></div>
     <div class="nitro"><span class="k">Nitro</span><div class="bar"><i id="nitro"></i></div></div>
+    <div class="surf"><span class="k">Surface</span><b id="surf">Grass</b></div>
   </div>
   <div class="keys"><b>W</b> gas · <b>S</b> brake · <b>A D</b> steer · <b>Space</b> wheelie · <b>Shift</b> nitro · <b>R</b> reset. In the air, W and S flip, A and D spin.</div>
   <div id="air" class="center"></div>
@@ -265,7 +269,7 @@ body {
     <p class="portrait-hint tip">Turn your phone sideways for the widest view.</p>
     <div class="row">
       <button id="btnRide" class="cta" type="button">Ride</button>
-      <span class="tip">Land with both wheels square to the ground.<br>Flips and 360s score big and refill nitro.</span>
+      <span class="tip">Follow the dirt trails for a faster, grippier ride.<br>Flips and 360s score big and refill nitro.</span>
     </div>
    </div>
    <section class="garage" aria-label="Choose your bike">
@@ -305,6 +309,21 @@ function noise(x, y) {
   const x2 = lerp(GX[ab] * xf + GZ[ab] * (yf - 1), GX[bb] * (xf - 1) + GZ[bb] * (yf - 1), u);
   return lerp(x1, x2, v) * 1.4;
 }
+// Same Perlin noise, also returning its x/y derivatives (in nd0, nd1, nd2) so the trail width can be measured in metres.
+let nd0 = 0, nd1 = 0, nd2 = 0;
+function noiseD(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, X = xi & 255, Y = yi & 255;
+  const u = xf * xf * xf * (xf * (xf * 6 - 15) + 10), v = yf * yf * yf * (yf * (yf * 6 - 15) + 10);
+  const du = 30 * xf * xf * (xf - 1) * (xf - 1), dv = 30 * yf * yf * (yf - 1) * (yf - 1);
+  const aa = perm[perm[X] + Y] & 7, ab = perm[perm[X] + Y + 1] & 7, ba = perm[perm[X + 1] + Y] & 7, bb = perm[perm[X + 1] + Y + 1] & 7;
+  const g00 = GX[aa] * xf + GZ[aa] * yf, g10 = GX[ba] * (xf - 1) + GZ[ba] * yf, g01 = GX[ab] * xf + GZ[ab] * (yf - 1), g11 = GX[bb] * (xf - 1) + GZ[bb] * (yf - 1);
+  const x1 = g00 + u * (g10 - g00), x2 = g01 + u * (g11 - g01);
+  const x1dx = GX[aa] + du * (g10 - g00) + u * (GX[ba] - GX[aa]), x2dx = GX[ab] + du * (g11 - g01) + u * (GX[bb] - GX[ab]);
+  const x1dy = GZ[aa] + u * (GZ[ba] - GZ[aa]), x2dy = GZ[ab] + u * (GZ[bb] - GZ[ab]);
+  nd0 = (x1 + v * (x2 - x1)) * 1.4;
+  nd1 = (x1dx + v * (x2dx - x1dx)) * 1.4;
+  nd2 = (x1dy + v * (x2dy - x1dy) + dv * (x2 - x1)) * 1.4;
+}
 function fbm(x, y, o) { let s = 0, a = .5, f = 1, n = 0; for (let i = 0; i < o; i++) { s += a * noise(x * f, y * f); n += a; a *= .5; f *= 2.03; } return s / n; }
 
 /* ---------- World shape ---------- */
@@ -312,6 +331,35 @@ const WATER = 0, CELL = 4, CN = 50, CS = CELL * CN, VIEW_R = 2;
 function desertness(x, z) { return smooth(0.12, 0.38, noise(x * 0.0011 + 77.3, z * 0.0011 - 33.1)); }
 function mountainMask(x, z) { return smooth(0.08, 0.42, noise(x * 0.0008 - 40.7, z * 0.0008 + 21.9)); }
 function forestness(x, z) { return smooth(-0.15, 0.35, noise(x * 0.0045 + 5.2, z * 0.0045 - 8.4)); }
+/* Trails: one contour line of domain-warped Perlin noise. Contours never end or branch, so the trail
+   winds forever across the map. Dividing by the gradient turns the noise value into metres from the centre line. */
+const TR_F = 0.0021, WARP_F = 0.0042, WARP_A = 38, TR_K = WARP_A * WARP_F, TR_HALF = 2.6;
+let trailC = 0, trN = 0;
+function trailSigned(x, z) {
+  noiseD(x * WARP_F + 17.1, z * WARP_F - 3.3); const a0 = nd0, ax = nd1, az = nd2;
+  noiseD(x * WARP_F - 9.7, z * WARP_F + 12.9); const b0 = nd0, bx = nd1, bz = nd2;
+  noiseD((x + a0 * WARP_A) * TR_F, (z + b0 * WARP_A) * TR_F);
+  trN = nd0;
+  const nx = nd1 * TR_F, nz = nd2 * TR_F;
+  const gx = nx * (1 + TR_K * ax) + nz * TR_K * bx, gz = nx * TR_K * az + nz * (1 + TR_K * bz);
+  return (nd0 - trailC) / Math.max(1e-7, Math.hypot(gx, gz));
+}
+trailSigned(20, 10); trailC = trN; // put a trail right through the starting meadow
+// Signed metres from the trail centre. Trails thin out and vanish on tall mountain ridges.
+function trailDistS(x, z, mount) {
+  const s = 1 - smooth(22, 50, mount);
+  if (s < 0.02) return 99;
+  return clamp(trailSigned(x, z) / s, -99, 99);
+}
+function mountainAt(x, z) {
+  const mm = mountainMask(x, z);
+  if (mm <= 0) return 0;
+  const r = 1 - Math.abs(fbm(x * 0.0026 + 3.1, z * 0.0026 + 9.4, 3));
+  const d2 = x * x + z * z;
+  return mm * r * r * r * 95 * (d2 < 170 * 170 ? smooth(90, 170, Math.sqrt(d2)) : 1);
+}
+const trailAt = (x, z) => trailDistS(x, z, mountainAt(x, z));
+let lastTrailD = 99;
 function rawHeight(x, z) {
   const hills = fbm(x * 0.0032 + 11.3, z * 0.0032 - 7.7, 4) * 24;
   const mm = mountainMask(x, z);
@@ -321,10 +369,15 @@ function rawHeight(x, z) {
   let dunes = 0;
   if (des > 0) dunes = des * (Math.sin(x * 0.05 + z * 0.018 + noise(x * 0.008, z * 0.008) * 4) * 0.5 + 0.5) * 3.2;
   const bumps = noise(x * 0.07 + .5, z * 0.07 + .5) * 0.45;
-  const h = 6 + hills + mount + dunes + bumps;
-  const d = Math.sqrt(x * x + z * z);
-  if (d >= 170) return h;
-  return lerp(9 + bumps * 0.4, h, smooth(90, 170, d));
+  let h = 6 + hills + mount + dunes + bumps, hs = 6 + hills + mount + dunes * 0.4;
+  const d2 = x * x + z * z;
+  let padK = 1;
+  if (d2 < 170 * 170) { padK = smooth(90, 170, Math.sqrt(d2)); h = lerp(9 + bumps * 0.4, h, padK); hs = lerp(9, hs, padK); }
+  // Grade the trail: drop the bumps and half the dunes, sink it a touch, fade it out where it fords a lake.
+  const td = trailDistS(x, z, mount * padK), ad = Math.abs(td);
+  lastTrailD = td;
+  if (ad < TR_HALF + 6) h = lerp(h, hs - 0.18, (1 - smooth(TR_HALF, TR_HALF + 6, ad)) * smooth(WATER - 0.5, WATER + 1.5, hs));
+  return h;
 }
 const gridH = (ix, iz) => rawHeight(ix * CELL, iz * CELL);
 // Same triangle split as the rendered mesh, so wheels sit exactly on what you see.
@@ -382,6 +435,7 @@ function getChunkData(cx, cz) {
     const x = x0 + rng() * CS, z = z0 + rng() * CS, r = rng(), s = rng(), rot = rng(), tint = rng();
     if (x * x + z * z < 45 * 45 || nearRamp(x, z)) continue;
     const h = rawHeight(x, z);
+    if (Math.abs(lastTrailD) < 5.5) continue;
     if (h < WATER + 1.4 || h > 64 || slopeAt(x, z) > 0.6) continue;
     const des = desertness(x, z);
     if (des > 0.55) {
@@ -398,7 +452,7 @@ function getChunkData(cx, cz) {
     const x = x0 + rng() * CS, z = z0 + rng() * CS, r = rng(), s = rng(), rot = rng(), tint = rng(), sq = rng();
     if (x * x + z * z < 45 * 45 || nearRamp(x, z)) continue;
     const h = rawHeight(x, z);
-    if (h < WATER - 0.5) continue;
+    if (h < WATER - 0.5 || Math.abs(lastTrailD) < 5) continue;
     if (r > 0.18 + mountainMask(x, z) * 0.6) continue;
     const sc = 0.6 + s * s * 2.2;
     const o = { x, z, y: terrainH(x, z) - sc * 0.25, s: sc, sy: sc * (0.55 + sq * 0.4), rot, tint, tilt: true };
@@ -419,6 +473,7 @@ function getChunkData(cx, cz) {
     const x = x0 + r2() * CS, z = z0 + r2() * CS, r = r2(), s = r2(), rot = r2(), tint = r2();
     if (x * x + z * z < 30 * 30 || nearRamp(x, z)) continue;
     const h = rawHeight(x, z);
+    if (Math.abs(lastTrailD) < 4.5) continue;
     if (h < WATER + 1.2 || h > 58 || desertness(x, z) > 0.45 || slopeAt(x, z) > 0.45) continue;
     if (r > 0.25 + forestness(x, z) * 0.5) continue;
     d.bushes.push({ x, z, y: terrainH(x, z) - 0.1, s: 0.6 + s * 0.9, sy: (0.6 + s * 0.9) * 0.75, rot, tint });
@@ -567,12 +622,25 @@ function makeDetailTexture() {
 }
 const detailTex = makeDetailTexture();
 const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0, map: detailTex, envMapIntensity: 0.7 });
+const DETAIL_GLSL = [
+  'float dA = texture2D(map, vUv).r;',
+  'float dB = texture2D(map, vUv * 0.137 + vec2(0.31, 0.71)).r;',
+  'float dC = texture2D(map, vUv * 3.7 + vec2(0.5, 0.2)).r;',
+  'diffuseColor.rgb *= 0.5 + (dA * 0.45 + dB * 0.35 + dC * 0.2);'
+].join('\n');
+const detailOnly = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', DETAIL_GLSL); };
 terrainMat.onBeforeCompile = sh => {
-  sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', [
-    'float dA = texture2D(map, vUv).r;',
-    'float dB = texture2D(map, vUv * 0.137 + vec2(0.31, 0.71)).r;',
-    'float dC = texture2D(map, vUv * 3.7 + vec2(0.5, 0.2)).r;',
-    'diffuseColor.rgb *= 0.5 + (dA * 0.45 + dB * 0.35 + dC * 0.2);'
+  sh.vertexShader = 'attribute float trail;\nvarying float vTrail;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvTrail = trail;');
+  sh.fragmentShader = 'varying float vTrail;\n' + sh.fragmentShader.replace('#include <map_fragment>', DETAIL_GLSL + '\n' + [
+    'float td = abs(vTrail);',
+    'float tm = 1.0 - smoothstep(2.0, 3.1, td + (dC - 0.5) * 1.3);',
+    'if (tm > 0.0) {',
+    '  vec3 dirt = mix(vec3(0.27, 0.17, 0.095), diffuseColor.rgb * 0.75, 0.25) * (0.75 + dA * 0.4 + dC * 0.2);',
+    '  float rut = exp(-pow((td - 0.85) / 0.26, 2.0));',
+    '  float crown = exp(-pow(td / 0.3, 2.0));',
+    '  dirt *= (1.0 - rut * 0.38) * (1.0 + crown * 0.15);',
+    '  diffuseColor.rgb = mix(diffuseColor.rgb, dirt, tm);',
+    '}'
   ].join('\n'));
 };
 
@@ -585,7 +653,7 @@ const COL = {
 function mix3(a, b, t, o) { o[0] = a[0] + (b[0] - a[0]) * t; o[1] = a[1] + (b[1] - a[1]) * t; o[2] = a[2] + (b[2] - a[2]) * t; return o; }
 const tmpA = [0, 0, 0], tmpB = [0, 0, 0];
 let lastGrass = 0;
-function terrainColor(h, ny, x, z, out, far) {
+function terrainColor(h, ny, x, z, out, far, td = 99) {
   const des = desertness(x, z);
   const nA = (noise(x * 0.012 + 3, z * 0.012 - 2) + 1) / 2, nB = (noise(x * 0.05, z * 0.05) + 1) / 2;
   mix3(COL.grassA, COL.grassB, nA, tmpA);
@@ -600,7 +668,7 @@ function terrainColor(h, ny, x, z, out, far) {
   const shoreT = smooth(WATER + 2.0, WATER + 0.6, h); mix3(COL.sand, COL.dune, des, tmpA); mix3(out, tmpA, shoreT, out); grass *= 1 - shoreT;
   mix3(out, COL.wet, smooth(WATER + 0.5, WATER - 0.3, h), out);
   mix3(out, COL.bed, smooth(WATER - 0.3, WATER - 2.5, h), out);
-  lastGrass = grass;
+  lastGrass = grass * smooth(TR_HALF + 0.3, TR_HALF + 2.5, Math.abs(td));
   const j = 0.95 + hash01(x, z) * 0.1;
   out[0] *= j; out[1] *= j; out[2] *= j;
   return out;
@@ -608,12 +676,12 @@ function terrainColor(h, ny, x, z, out, far) {
 
 /* Smooth-shaded terrain patch. Same diagonal as terrainH. Near patches get skirts to hide seams. */
 function* terrainGeoGen(ox, oz, N, cell, opts) {
-  const W = N + 1, B = N + 3, HB = new Float32Array(B * B), drop = opts.drop || 0;
+  const W = N + 1, B = N + 3, HB = new Float32Array(B * B), TB = new Float32Array(B * B), drop = opts.drop || 0;
   for (let j = 0; j < B; j++) {
-    for (let i = 0; i < B; i++) HB[j * B + i] = rawHeight(ox + (i - 1) * cell, oz + (j - 1) * cell) - drop;
+    for (let i = 0; i < B; i++) { HB[j * B + i] = rawHeight(ox + (i - 1) * cell, oz + (j - 1) * cell) - drop; TB[j * B + i] = lastTrailD; }
     if (opts.yieldRows && j % opts.yieldRows === 0) yield;
   }
-  const pos = new Float32Array(W * W * 3), nor = new Float32Array(W * W * 3), col = new Float32Array(W * W * 3), uv = new Float32Array(W * W * 2);
+  const pos = new Float32Array(W * W * 3), nor = new Float32Array(W * W * 3), col = new Float32Array(W * W * 3), uv = new Float32Array(W * W * 2), tr = new Float32Array(W * W);
   const grass = opts.grass ? new Float32Array(W * W) : null, c = [0, 0, 0];
   for (let j = 0; j < W; j++) {
     for (let i = 0; i < W; i++) {
@@ -622,7 +690,9 @@ function* terrainGeoGen(ox, oz, N, cell, opts) {
       const il = 1 / Math.sqrt(dx * dx + 1 + dz * dz);
       pos[k * 3] = x; pos[k * 3 + 1] = h; pos[k * 3 + 2] = z;
       nor[k * 3] = -dx * il; nor[k * 3 + 1] = il; nor[k * 3 + 2] = -dz * il;
-      terrainColor(h + drop, il, x, z, c, opts.far);
+      const td = TB[(j + 1) * B + i + 1];
+      tr[k] = td;
+      terrainColor(h + drop, il, x, z, c, opts.far, td);
       col[k * 3] = c[0]; col[k * 3 + 1] = c[1]; col[k * 3 + 2] = c[2];
       uv[k * 2] = x / 5; uv[k * 2 + 1] = z / 5;
       if (grass) grass[k] = lastGrass;
@@ -635,13 +705,14 @@ function* terrainGeoGen(ox, oz, N, cell, opts) {
     const a = j * W + i, b = a + 1, c2 = a + W, d = c2 + 1;
     idx.push(a, d, b, a, c2, d);
   }
-  let P = pos, NN = nor, CC = col, UU = uv;
+  let P = pos, NN = nor, CC = col, UU = uv, TT = tr;
   if (opts.skirt) {
     const edges = [];
     for (let i = 0; i < N; i++) edges.push([i, i + 1], [N * W + i + 1, N * W + i], [(i + 1) * W, i * W], [i * W + N, (i + 1) * W + N]);
     const base = W * W, extra = W * W;
     P = new Float32Array((W * W + extra) * 3); P.set(pos); NN = new Float32Array(P.length); NN.set(nor);
     CC = new Float32Array(P.length); CC.set(col); UU = new Float32Array((W * W + extra) * 2); UU.set(uv);
+    TT = new Float32Array(W * W + extra); TT.set(tr); TT.set(tr, base);
     for (let k = 0; k < W * W; k++) {
       P[(base + k) * 3] = pos[k * 3]; P[(base + k) * 3 + 1] = pos[k * 3 + 1] - 8; P[(base + k) * 3 + 2] = pos[k * 3 + 2];
       for (let q = 0; q < 3; q++) { NN[(base + k) * 3 + q] = nor[k * 3 + q]; CC[(base + k) * 3 + q] = col[k * 3 + q] * 0.8; }
@@ -654,6 +725,7 @@ function* terrainGeoGen(ox, oz, N, cell, opts) {
   g.setAttribute('normal', new THREE.BufferAttribute(NN, 3));
   g.setAttribute('color', new THREE.BufferAttribute(CC, 3));
   g.setAttribute('uv', new THREE.BufferAttribute(UU, 2));
+  g.setAttribute('trail', new THREE.BufferAttribute(TT, 1));
   g.setIndex(idx);
   g.computeBoundingSphere();
   return { geo: g, grass, col };
@@ -716,7 +788,7 @@ const CACTUS = mergeParts([
 const ROCK = mergeParts([[lumpy(new THREE.DodecahedronGeometry(1, 1), 0.4, 8), '#8d867b', mtx(0, 0, 0)]]);
 const instMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0, envMapIntensity: 0.7 });
 const rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, map: detailTex, envMapIntensity: 0.7 });
-rockMat.onBeforeCompile = terrainMat.onBeforeCompile;
+rockMat.onBeforeCompile = detailOnly;
 ROCK.setAttribute('uv', new THREE.Float32BufferAttribute(Array.from(ROCK.attributes.position.array).filter((_, i) => i % 3 !== 1).map(v => v * 0.6), 2));
 const rampMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.6 });
 
@@ -1255,7 +1327,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 
 /* ---------- HUD ---------- */
 const hud = $('hud'), titleEl = $('title');
-const el = { score: $('score'), best: $('best'), flags: $('flags'), odo: $('odo'), speed: $('speed'), gear: $('gear'), nitro: $('nitro'), trick: $('trick'), bail: $('bail'), air: $('air'), flagDist: $('flagDist') };
+const el = { score: $('score'), best: $('best'), flags: $('flags'), odo: $('odo'), speed: $('speed'), gear: $('gear'), nitro: $('nitro'), trick: $('trick'), bail: $('bail'), air: $('air'), flagDist: $('flagDist'), surf: $('surf') };
 const shown = {};
 function setText(k, v) { if (shown[k] !== v) { shown[k] = v; el[k].textContent = v; } }
 function flash(node, html) { node.innerHTML = html; node.classList.remove('show'); void node.offsetWidth; node.classList.add('show'); }
@@ -1382,7 +1454,9 @@ function step(dt) {
     if (inp.up) { const top = boosting ? bikeSpec.boostTop : bikeSpec.top; const f = b.speed > 0 ? 1 - Math.pow(clamp(b.speed / top, 0, 1), 2) : 1; acc += (boosting ? bikeSpec.boostAcc : bikeSpec.acc) * f; }
     if (inp.down) { if (b.speed > 0.5) acc -= 20; else acc -= 7 * (1 - clamp(-b.speed / 6, 0, 1)); }
     acc -= G * Math.sin(slopeAng);
-    acc -= b.speed * 0.18 + 0.0035 * b.speed * sp;
+    const onTrail = Math.abs(trailAt(b.x, b.z)) < TR_HALF + 0.4 && depth <= 0;
+    b.onTrail = onTrail;
+    acc -= b.speed * (onTrail ? 0.11 : 0.18) + 0.0035 * b.speed * sp;
     if (depth > 0) acc -= b.speed * (1.2 + depth * 3);
     b.speed += acc * dt;
     if (!inp.up && !inp.down && Math.abs(b.speed) < 0.4 && Math.abs(slopeAng) < 0.35) b.speed = 0;
@@ -1390,7 +1464,7 @@ function step(dt) {
     b.boosting = boosting;
     const st = touchSteer !== null ? touchSteer : (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
     b.steer = lerp(b.steer, st, damp(9, dt));
-    const turn = b.steer * 2.5 * bikeSpec.turn * clamp(sp / 4, 0, 1) / (1 + sp / 24);
+    const turn = b.steer * 2.5 * bikeSpec.turn * (b.onTrail ? 1.1 : 1) * clamp(sp / 4, 0, 1) / (1 + sp / 24);
     b.yaw -= turn * dt * (b.speed < 0 ? -1 : 1);
     b.lean = lerp(b.lean, b.steer * clamp(sp / 14, 0, 1) * 0.6, damp(6, dt));
     b.wheelie = lerp(b.wheelie, inp.lean && b.speed > 2 ? 0.55 : 0, damp(inp.lean ? 3 : 6, dt));
@@ -1512,7 +1586,9 @@ function refreshMap() {
     for (let i = 0; i < MAPN; i++) {
       const x = mapCx - (i - MAPN / 2) * MAPS, z = mapCz - (j - MAPN / 2) * MAPS, h = rawHeight(x, z), o = (j * MAPN + i) * 4;
       let r, g, bl;
+      const onT = Math.abs(lastTrailD) < 5.5;
       if (h < WATER) { const k = clamp(1 + h / 12, 0.55, 1); r = 52 * k; g = 105 * k; bl = 142 * k; }
+      else if (onT) { r = 122; g = 84; bl = 50; }
       else {
         const des = desertness(x, z);
         if (h > 68) { r = 232; g = 236; bl = 238; }
@@ -1585,6 +1661,16 @@ function updHud() {
   setText('best', best.toLocaleString());
   setText('flags', String(collected.size));
   setText('odo', (odo / 1000).toFixed(1) + ' km');
+  let surf = 'Grass';
+  if (!b.grounded) surf = 'Airborne';
+  else if (terrainH(b.x, b.z) < WATER) surf = 'Water';
+  else if (groundH(b.x, b.z) > terrainH(b.x, b.z) + 0.05) surf = 'Ramp';
+  else if (b.onTrail) surf = 'Trail';
+  else if (b.y > 64) surf = 'Snow';
+  else if (mountainMask(b.x, b.z) > 0.45 && b.y > 40) surf = 'Rock';
+  else if (desertness(b.x, b.z) > 0.5) surf = 'Sand';
+  if (shown.surf !== surf) el.surf.classList.toggle('trail', surf === 'Trail');
+  setText('surf', surf);
   el.nitro.style.width = (b.nitro * 100).toFixed(1) + '%';
   if (!b.grounded && !b.crashed && b.air > 0.35) {
     const f = b.flip / TAU, s = b.spin / TAU;
