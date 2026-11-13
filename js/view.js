@@ -11,6 +11,10 @@ function syncBike(dt) {
   m.root.rotation.set(-b.pitch, b.yaw, b.lean + (b.crashed ? b.roll : 0));
   m.wheelie.rotation.x = -b.wheelie;
   m.steer.rotation.y = -b.steer * 0.35;
+  // Rider tucks forward on the gas, sits back for wheelies and into the turn.
+  const lean = b.crashed ? 0.5 : b.grounded ? (keys.up ? 0.16 : 0.05) - b.wheelie * 0.5 : 0.1 - b.pitchVel * 0.03;
+  b.riderLean = lerp(b.riderLean || 0, lean, damp(5, dt));
+  m.rider.rotation.set(b.riderLean, 0, b.lean * 0.35);
   const target = b.grounded ? b.speed : (keys.up ? 30 : b.spinW * 0.98);
   b.spinW = b.grounded ? b.speed : lerp(b.spinW, target, damp(2, dt));
   const rw = R_WHEEL * bikeSpec.scale;
