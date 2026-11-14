@@ -183,7 +183,7 @@ function gearTexture(base, accent, kind) {
   });
 }
 function buildBike(spec) {
-  const look = LOOKS[spec.id] || LOOKS.trail;
+  const look = Object.assign({}, LOOKS[spec.id] || LOOKS.trail, spec.paintPants ? { pants: spec.paintPants, helmet: spec.paintHelmet } : {});
   const root = new THREE.Group();
   const wheelie = new THREE.Group(); wheelie.position.set(0, 0, -0.72); root.add(wheelie);
   const body = new THREE.Group(); body.position.set(0, 0, 0.72); wheelie.add(body);
@@ -479,7 +479,8 @@ function setBike(id) {
     const shared = new Set(Object.values(bikeTextures()));
     model.root.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map && !shared.has(o.material.map)) o.material.map.dispose(); } });
   }
-  model = buildBike(bikeSpec);
+  model = buildBike(paintedSpec(bikeSpec));
+  if ($('paints')) renderPaints();
   syncBike(0);
   document.querySelectorAll('.bike').forEach(e => e.setAttribute('aria-pressed', String(e.dataset.id === bikeSpec.id)));
   $('bikeNote').textContent = bikeSpec.blurb;
@@ -491,12 +492,13 @@ function renderGarage() {
   const stat = (label, v) => `<span>${label}</span><i style="--v:${clamp(v, 0.08, 1).toFixed(2)}"></i>`;
   for (const b of BIKES) {
     const btn = document.createElement('button');
-    btn.type = 'button'; btn.className = 'bike'; btn.dataset.id = b.id;
+    const locked = !owns('bikes', b.id), price = BIKE_PRICE[b.id] || 0;
+    btn.type = 'button'; btn.className = 'bike' + (locked ? ' locked' : ''); btn.dataset.id = b.id;
     btn.setAttribute('aria-pressed', String(b.id === bikeSpec.id));
     btn.style.setProperty('--c', b.plastic); btn.style.setProperty('--n', b.numInk);
-    btn.innerHTML = `<span class="swatch">${b.num}</span><span class="bname">${b.name}</span><span class="blurb">${b.blurb}</span>` +
+    btn.innerHTML = `<span class="swatch">${b.num}</span><span class="bname">${b.name}</span>${locked ? `<span class="lockprice">${price.toLocaleString()} coins</span>` : ''}<span class="blurb">${b.blurb}</span>` +
       `<span class="bars">${stat('Speed', b.top / 50)}${stat('Accel', (b.acc - 11) / 12)}${stat('Handling', b.turn / 1.3)}${stat('Air', b.air / 1.65)}</span>`;
-    btn.addEventListener('click', () => setBike(b.id));
+    btn.addEventListener('click', () => tryBuy('bikes', b.id, price, b.name, () => { setBike(b.id); renderGarage(); }));
     wrap.appendChild(btn);
   }
 }
@@ -530,12 +532,13 @@ function renderWorlds() {
   wrap.textContent = '';
   for (const w of WORLDS) {
     const btn = document.createElement('button');
-    btn.type = 'button'; btn.className = 'world'; btn.dataset.id = w.id;
+    const locked = !owns('worlds', w.id), price = WORLD_PRICE[w.id] || 0;
+    btn.type = 'button'; btn.className = 'world' + (locked ? ' locked' : ''); btn.dataset.id = w.id;
     btn.setAttribute('aria-pressed', String(w.id === W.id));
     btn.title = w.blurb;
     btn.style.setProperty('--c', w.swatch); btn.style.setProperty('--sky', w.top);
-    btn.innerHTML = `<i></i><span>${w.name}</span>`;
-    btn.addEventListener('click', () => { if (w.id !== W.id) setWorld(w.id); });
+    btn.innerHTML = `<i></i><span>${w.name}</span>${locked ? `<span class="lockprice">${price.toLocaleString()} coins</span>` : ''}`;
+    btn.addEventListener('click', () => tryBuy('worlds', w.id, price, w.name, () => { if (w.id !== W.id) setWorld(w.id); renderWorlds(); }));
     wrap.appendChild(btn);
   }
 }

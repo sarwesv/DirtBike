@@ -14,6 +14,10 @@ Pick from thirteen bikes in the garage: Trail 250, Pit 125, Enduro 450, Rally 50
 
 Every map has races built from its own trail: Trail Sprint, Trail Marathon, Backtrail and the two-lap Meadow Loop. Ride through the checkpoint gates against the clock for gold, silver or bronze. Your best run on each event is saved and races alongside you as a ghost.
 
+## Coins and unlocks
+
+Earn coins from tricks, flags, races and distance. Spend them in the garage to unlock bikes, maps and paint jobs. The Trail 250, Pit 125 and Open Country are free.
+
 ## Project layout
 
 No build step. `index.html` loads the stylesheet, three.js from a CDN, then the game scripts in order. The scripts are plain (non-module) files that share one global scope, so the game also runs straight from disk by double-clicking `index.html`.
@@ -28,6 +32,7 @@ js/scenery.js       trees, rocks, grass, chunk streaming, distant terrain, cloud
 js/bikes.js         bike specs, bike and rider model, garage picker
 js/effects.js       tyre tracks and dust particles
 js/audio.js         engine sound and effects
+js/progress.js      coins, unlockable bikes and maps, paint jobs
 js/controls.js      save data, game state, keyboard and touch input
 js/physics.js       riding, jumps, tricks, landings, crashes, flags
 js/view.js          bike model sync and chase camera

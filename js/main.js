@@ -88,9 +88,9 @@ function start(data) {
   renderGarage();
   renderEvents();
   applyQuality();
-  setWorld((data && data.world) || savedWorld, true);
+  setWorld(owns('worlds', (data && data.world) || savedWorld) ? ((data && data.world) || savedWorld) : 'open', true);
   renderWorlds();
-  setBike((data && data.bike) || savedBike);
+  setBike(owns('bikes', (data && data.bike) || savedBike) ? ((data && data.bike) || savedBike) : 'trail');
   if (data && typeof data.x === 'number') {
     refreshNearRamps(data.x, data.z);
     Object.assign(bike, { x: data.x, z: data.z, yaw: data.yaw || 0, y: groundH(data.x, data.z) });

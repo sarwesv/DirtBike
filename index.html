@@ -18,6 +18,7 @@
   <div class="tl">
     <div class="plate"><span class="k">Score</span><span id="score">0</span></div>
     <div class="stats">
+      <div class="coinstat"><span class="k">Coins</span><b id="coins">0</b></div>
       <div><span class="k">Flags</span><b id="flags">0</b></div>
       <div><span class="k">Best</span><b id="best">0</b></div>
       <div><span class="k">Odometer</span><b id="odo">0.0 km</b></div>
@@ -55,6 +56,7 @@
   </div>
 </div>
 
+<div id="toast" class="toast" role="status" hidden></div>
 <div id="title">
   <div class="card">
    <div class="intro">
@@ -90,7 +92,9 @@
     <h2 class="k">Map</h2>
     <div class="worlds" id="worlds"></div>
     <p class="world-note" id="worldNote"></p>
-    <h2 class="k">Garage · pick a bike</h2>
+    <h2 class="k">Paint</h2>
+    <div class="paints" id="paints"></div>
+    <h2 class="k">Garage · pick a bike · <span class="coinbal" id="coinsTitle">0</span> coins</h2>
     <p class="world-note" id="bikeNote"></p>
     <div class="bikes" id="bikes"></div>
    </section>
@@ -106,6 +110,7 @@
 <script src="js/effects.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/controls.js"></script>
+<script src="js/progress.js"></script>
 <script src="js/physics.js"></script>
 <script src="js/view.js"></script>
 <script src="js/minimap.js"></script>

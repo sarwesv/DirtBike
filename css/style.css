@@ -211,6 +211,20 @@ body {
 .world i { width: 100%; height: 26px; border-radius: 6px; background: linear-gradient(180deg, var(--sky) 0 45%, var(--c) 45% 100%); box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
 .world[aria-pressed="true"] { border-color: var(--plate); box-shadow: 0 0 0 1px var(--plate), 0 8px 22px rgba(0,0,0,.35); }
 .world:focus-visible { outline: 2px solid var(--plate); outline-offset: 2px; }
+.coinbal { color: var(--plate); }
+.coinstat b { color: var(--plate); transition: transform .2s ease-out; display: inline-block; }
+.coinstat.bump b { transform: scale(1.25); }
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 5; background: var(--plate); color: var(--plate-ink); font-weight: 700; padding: 10px 16px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.4); max-width: min(90vw, 460px); text-align: center; }
+.paints { display: flex; gap: 8px; flex-wrap: wrap; }
+.paint { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; background: var(--panel); border: 2px solid var(--line); border-radius: 999px; color: var(--text); font: 700 13px/1 var(--font-ui); cursor: pointer; }
+.paint i { width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(135deg, var(--a) 0 55%, var(--b) 55% 100%); box-shadow: inset 0 0 0 1px rgba(0,0,0,.3); }
+.paint em, .lockprice { font-style: normal; font-size: 11px; color: var(--plate); }
+.paint[aria-pressed="true"] { border-color: var(--plate); }
+.paint:focus-visible { outline: 2px solid var(--plate); outline-offset: 2px; }
+.bike.locked, .world.locked { opacity: .78; }
+.bike.locked .swatch { filter: grayscale(.6); }
+.lockprice { display: block; font-weight: 700; letter-spacing: .04em; }
+.bike .lockprice { grid-area: name; align-self: start; justify-self: end; }
 .events-wrap { display: flex; flex-direction: column; gap: 8px; }
 .events { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .event {

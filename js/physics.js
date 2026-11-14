@@ -110,10 +110,10 @@ function checkFlags() {
     for (const f of getChunkData(pcx + i, pcz + j).flags) {
       if (collected.has(f.id)) continue;
       if ((bike.x - f.x) ** 2 + (bike.z - f.z) ** 2 < 22 && Math.abs(bike.y - f.y) < 9) {
-        collected.add(f.id); score += 1000; bike.nitro = 1;
+        collected.add(f.id); score += 1000; bike.nitro = 1; earn(60);
         const ch = chunks.get(k); const obj = ch && ch.flagObjs.get(f.id);
         if (obj) { ch.group.remove(obj); ch.flagObjs.delete(f.id); }
-        flash(el.trick, `Flag ${collected.size}<small>Nitro refilled · +1,000</small>`);
+        flash(el.trick, `Flag ${collected.size}<small>Nitro refilled · +1,000 · +60 coins</small>`);
         chime(); save(); nearestT = 0;
       }
     }
@@ -175,7 +175,7 @@ function step(dt) {
     if (Math.abs(b.slide) > 2.5) b.drifting = true; else b.drifting = false;
     const gN = groundH(nx, nz), yBall = b.y + b.vy * dt - 0.5 * G * dt * dt;
     b.x = nx; b.z = nz;
-    odo += sp * dt;
+    odo += sp * dt; distanceCoins(sp * dt);
     if (gN < yBall - 0.04 && sp > 5) {
       b.vx = Math.sin(b.yaw) * b.speed + rxv * b.slide; b.vz = Math.cos(b.yaw) * b.speed + rzv * b.slide; b.y = yBall; b.vy -= G * dt;
       startAir();
