@@ -27,25 +27,36 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) keys[k] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+// Touch buttons and the joystick can both hold the same control (gas, brake); a key is down while either holds it.
+const btnHeld = {}, joyHeld = {};
+const syncTouchKey = k => { keys[k] = !!(btnHeld[k] || joyHeld[k]); };
 document.querySelectorAll('#touch button').forEach(btn => {
   const k = btn.dataset.k;
-  const on = e => { e.preventDefault(); keys[k] = true; btn.classList.add('on'); try { btn.setPointerCapture(e.pointerId); } catch (_) {} initAudio(); };
-  const off = () => { keys[k] = false; btn.classList.remove('on'); };
+  const on = e => { e.preventDefault(); btnHeld[k] = true; syncTouchKey(k); btn.classList.add('on'); try { btn.setPointerCapture(e.pointerId); } catch (_) {} initAudio(); };
+  const off = () => { btnHeld[k] = false; syncTouchKey(k); btn.classList.remove('on'); };
   btn.addEventListener('pointerdown', on); btn.addEventListener('pointerup', off); btn.addEventListener('pointercancel', off); btn.addEventListener('lostpointercapture', off);
 });
 
-// Analog thumb steering: slide anywhere on the pad, release to centre.
+// Round joystick, all directions: up = gas, down = brake, left/right = analog steering.
+// In the air the same directions flip (up/down) and spin (left/right), just like W/A/S/D.
 let touchSteer = null;
 {
   const pad = $('steerPad'), knob = pad.querySelector('.knob');
   let pid = null;
   const setV = v => {
-    touchSteer = v;
-    keys.left = v !== null && v < -0.35; keys.right = v !== null && v > 0.35;
-    knob.style.transform = v === null ? '' : `translateX(${(v * (pad.clientWidth / 2 - 38)).toFixed(1)}px)`;
-    pad.setAttribute('aria-valuenow', v === null ? '0' : v.toFixed(2));
+    touchSteer = v ? (Math.abs(v.x) < 0.12 ? 0 : v.x) : null;
+    joyHeld.left = !!v && v.x < -0.35; joyHeld.right = !!v && v.x > 0.35;
+    joyHeld.up = !!v && v.y < -0.4; joyHeld.down = !!v && v.y > 0.45;
+    for (const k of ['left', 'right', 'up', 'down']) syncTouchKey(k);
+    const reach = pad.clientWidth / 2 - knob.offsetWidth / 2;
+    knob.style.transform = v ? `translate(${(v.x * reach).toFixed(1)}px, ${(v.y * reach).toFixed(1)}px)` : '';
   };
-  const read = e => { const r = pad.getBoundingClientRect(); return clamp((e.clientX - (r.left + r.width / 2)) / (r.width / 2 - 30), -1, 1); };
+  const read = e => {
+    const r = pad.getBoundingClientRect(), reach = r.width / 2 - knob.offsetWidth / 2;
+    let x = (e.clientX - (r.left + r.width / 2)) / reach, y = (e.clientY - (r.top + r.height / 2)) / reach;
+    const len = Math.hypot(x, y); if (len > 1) { x /= len; y /= len; } // keep the knob inside the ring
+    return { x, y };
+  };
   pad.addEventListener('pointerdown', e => { e.preventDefault(); pid = e.pointerId; try { pad.setPointerCapture(pid); } catch (_) {} pad.classList.add('active'); setV(read(e)); initAudio(); });
   pad.addEventListener('pointermove', e => { if (e.pointerId === pid) setV(read(e)); });
   const end = e => { if (e.pointerId !== pid) return; pid = null; pad.classList.remove('active'); setV(null); };

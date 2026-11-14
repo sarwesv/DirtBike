@@ -85,12 +85,12 @@ body {
 #touch { display: none; }
 .steer, .pads { position: absolute; bottom: calc(var(--edge) + env(safe-area-inset-bottom, 0px)); pointer-events: auto; touch-action: none; -webkit-touch-callout: none; }
 .steer {
-  left: calc(var(--edge) + env(safe-area-inset-left, 0px)); width: clamp(150px, 30vw, 230px); height: 84px; border-radius: 42px;
-  background: var(--panel); border: 2px solid var(--line); display: flex; align-items: center; justify-content: space-between;
-  padding-inline: 14px; color: var(--muted); font-size: 16px; backdrop-filter: blur(6px);
+  /* Round joystick: dark disc inside a white ring, with a solid white knob. */
+  left: calc(var(--edge) + env(safe-area-inset-left, 0px)); width: 136px; height: 136px; border-radius: 50%;
+  background: rgba(58, 58, 58, 0.86); border: 3px solid #ffffff; box-shadow: 0 6px 18px rgba(0,0,0,.35);
 }
-.knob { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; margin: -31px 0 0 -31px; border-radius: 50%; background: var(--text); box-shadow: 0 4px 12px rgba(0,0,0,.45); transition: transform .14s ease-out; }
-.steer.active .knob { transition: none; background: var(--plate); }
+.knob { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: #ffffff; box-shadow: 0 3px 10px rgba(0,0,0,.35); transition: transform .14s ease-out; }
+.steer.active .knob { transition: none; }
 .pads { right: calc(var(--edge) + env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: auto auto; grid-template-areas: "lean boost" "down up"; gap: 10px; align-items: end; justify-items: center; }
 .pads button {
   width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--line); background: var(--panel); color: var(--text);
@@ -148,7 +148,7 @@ body {
   .tl .stats { flex-wrap: wrap; }
 }
 @media (pointer: coarse) and (orientation: portrait) and (max-width: 360px) {
-  .steer { width: 128px; height: 72px; }
+  .steer { width: 116px; height: 116px; }
   .knob { width: 54px; height: 54px; margin: -27px 0 0 -27px; }
   .pads { gap: 8px; }
   .pads [data-k="up"] { width: 74px; height: 74px; }
@@ -169,8 +169,8 @@ body {
   .tr { flex-direction: row-reverse; align-items: flex-start; }
   .map { width: 84px; height: 84px; }
   #flagDist { font-size: 11px; }
-  .steer { width: clamp(140px, 24vw, 200px); height: 70px; }
-  .knob { width: 52px; height: 52px; margin: -26px 0 0 -26px; }
+  .steer { width: 120px; height: 120px; }
+  .knob { width: 56px; height: 56px; margin: -28px 0 0 -28px; }
   .pads { gap: 8px; }
   .pads [data-k="up"] { width: 72px; height: 72px; font-size: 13px; }
   .pads [data-k="down"] { width: 60px; height: 60px; font-size: 12px; }
