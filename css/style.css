@@ -239,7 +239,14 @@ body {
 .race-hud { position: absolute; top: calc(var(--edge) + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); text-align: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 16px 8px; backdrop-filter: blur(6px); }
 #raceTime { font-size: 34px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; color: var(--plate); }
 #raceInfo { font-size: 13px; color: var(--muted); font-weight: 600; margin-top: 3px; }
-@media (max-width: 720px), (max-height: 520px) { #raceTime { font-size: 24px; } .race-hud { padding: 4px 10px 5px; top: calc(110px + env(safe-area-inset-top, 0px)); } }
+/* Phones: keep the race timer a slim strip out of the way of the bike. */
+@media (max-width: 720px), (max-height: 520px) {
+  .race-hud { display: flex; align-items: baseline; gap: 8px; padding: 3px 10px 4px; top: calc(var(--edge) + env(safe-area-inset-top, 0px)); max-width: 30vw; }
+  #raceTime { font-size: 18px; } #raceInfo { font-size: 11px; margin-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+@media (orientation: portrait) and (max-width: 720px) {
+  .race-hud { top: calc(150px + env(safe-area-inset-top, 0px)); max-width: 80vw; }
+}
 @media (max-width: 420px) { .events { grid-template-columns: minmax(0, 1fr); } }
 .world-note, .card p.world-note { font-size: 13px; color: var(--muted); margin: -2px 0 4px; min-height: 1.3em; }
 .bike[aria-pressed="true"] { border-color: var(--plate); box-shadow: 0 0 0 1px var(--plate), 0 8px 22px rgba(0,0,0,.35); }

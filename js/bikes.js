@@ -454,16 +454,16 @@ function buildBike(spec) {
   const rider = new THREE.Group(); rider.position.set(0, 1.02, -0.2); body.add(rider);
   const up = new THREE.Group(); up.position.set(0, -1.02, 0.2); rider.add(up);
   // Torso, pelvis, chest and back protectors, neck brace.
-  capsule(up, [0, 1.06, -0.18], [0, 1.52, 0.02], 0.15, 0.17, jersey, 1.3, 0.85);
-  capsule(up, [-0.13, 1.04, -0.2], [0.13, 1.04, -0.2], 0.105, 0.105, pants);
-  const chest = put(up, new THREE.SphereGeometry(0.2, 18, 12, 0, Math.PI, Math.PI * 0.22, Math.PI * 0.5), shell, [0, 1.37, -0.03], [0.42, 0, 0]);
-  chest.scale.set(1.28, 1.25, 0.72);
-  const backP = put(up, new THREE.SphereGeometry(0.2, 18, 12, Math.PI, Math.PI, Math.PI * 0.18, Math.PI * 0.55), shell, [0, 1.35, -0.1], [0.42, 0, 0]);
-  backP.scale.set(1.25, 1.3, 0.7);
-  put(up, new THREE.PlaneGeometry(0.2, 0.15), new THREE.MeshStandardMaterial({ map: plateTexture(spec, true), transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }), [0, 1.42, -0.255], [0.42, Math.PI, 0]);
-  put(up, new THREE.TorusGeometry(0.1, 0.035, 8, 18), shell, [0, 1.62, 0.04], [Math.PI / 2 - 0.4, 0, 0]);
+  capsule(up, [0, 1.06, -0.18], [0, 1.52, 0.02], 0.115, 0.135, jersey, 1.18, 0.8);
+  capsule(up, [-0.12, 1.04, -0.2], [0.12, 1.04, -0.2], 0.082, 0.082, pants);
+  const chest = put(up, new THREE.SphereGeometry(0.16, 18, 12, 0, Math.PI, Math.PI * 0.22, Math.PI * 0.5), shell, [0, 1.37, -0.04], [0.42, 0, 0]);
+  chest.scale.set(1.15, 1.25, 0.62);
+  const backP = put(up, new THREE.SphereGeometry(0.16, 18, 12, Math.PI, Math.PI, Math.PI * 0.18, Math.PI * 0.55), shell, [0, 1.35, -0.09], [0.42, 0, 0]);
+  backP.scale.set(1.12, 1.3, 0.62);
+  put(up, new THREE.PlaneGeometry(0.2, 0.15), new THREE.MeshStandardMaterial({ map: plateTexture(spec, true), transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }), [0, 1.42, -0.215], [0.42, Math.PI, 0]);
+  put(up, new THREE.TorusGeometry(0.085, 0.028, 8, 18), shell, [0, 1.62, 0.04], [Math.PI / 2 - 0.4, 0, 0]);
   for (const s of [-1, 1]) {
-    const cup = put(up, new THREE.SphereGeometry(0.085, 14, 10, 0, TAU, 0, Math.PI * 0.55), plastic2, [s * 0.21, 1.54, 0.02], [0, 0, -s * 0.5]);
+    const cup = put(up, new THREE.SphereGeometry(0.068, 14, 10, 0, TAU, 0, Math.PI * 0.55), plastic2, [s * 0.18, 1.535, 0.02], [0, 0, -s * 0.5]);
     cup.scale.set(1, 0.8, 1.1);
   }
   // Limb segments live in the bike body's space; poseRider() stretches them between solved joints.
@@ -472,17 +472,17 @@ function buildBike(spec) {
   const limbs = { arms: [], legs: [] };
   for (const s of [-1, 1]) {
     limbs.legs.push({
-      s, hip: [s * 0.12, 1.04, -0.2], ankle: [s * 0.215, 0.8, 0.0], l1: 0.38, l2: 0.33,
-      thigh: seg(0.095, 0.072, pants), shin: seg(0.07, 0.058, pants), knee: joint(0.072, pants),
-      brace: (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.2, 0.06), shell); body.add(m); return m; })(),
-      cap: (() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 8, 0, TAU, 0, Math.PI * 0.6), plastic2); body.add(m); return m; })()
+      s, hip: [s * 0.11, 1.04, -0.2], ankle: [s * 0.215, 0.8, 0.0], l1: 0.38, l2: 0.33,
+      thigh: seg(0.075, 0.058, pants), shin: seg(0.056, 0.047, pants), knee: joint(0.058, pants),
+      brace: (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.19, 0.05), shell); body.add(m); return m; })(),
+      cap: (() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.062, 12, 8, 0, TAU, 0, Math.PI * 0.6), plastic2); body.add(m); return m; })()
     });
     limbs.arms.push({
-      s, shoulder: [s * 0.2, 1.52, 0.02], grip: [s * 0.34, 1.195, -0.185], l1: 0.31, l2: 0.29,
-      upper: seg(0.062, 0.054, jersey), fore: seg(0.052, 0.044, jersey), elbow: joint(0.056, jersey),
-      pad: (() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8, 0, TAU, 0, Math.PI * 0.55), shell); body.add(m); return m; })(),
-      hand: (() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 10), glove); m.scale.set(1.35, 0.95, 1); body.add(m); return m; })(),
-      knuckle: (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.025, 0.05), plastic2); body.add(m); return m; })()
+      s, shoulder: [s * 0.18, 1.52, 0.02], grip: [s * 0.34, 1.195, -0.185], l1: 0.31, l2: 0.29,
+      upper: seg(0.048, 0.042, jersey), fore: seg(0.042, 0.035, jersey), elbow: joint(0.045, jersey),
+      pad: (() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8, 0, TAU, 0, Math.PI * 0.55), shell); body.add(m); return m; })(),
+      hand: (() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 10), glove); m.scale.set(1.35, 0.95, 1); body.add(m); return m; })(),
+      knuckle: (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.022, 0.044), plastic2); body.add(m); return m; })()
     });
   }
   // Helmet: shell with a curved chin bar and mouth vent, peak, framed goggles with a mirrored lens.
