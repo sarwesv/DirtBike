@@ -6,9 +6,9 @@ Ride across endless procedurally generated terrain (grassland, pine forest, dese
 
 Dirt trails wind endlessly across the map. Each one is a contour line of domain-warped Perlin noise, graded smooth into the terrain. Packed dirt rolls faster and grips better than grass.
 
-Pick a map on the title screen: Open Country, Deep Forest, Red Desert or Alpine Ridge. Each reshapes the world, sky and fog and has its own flags.
+Pick a map on the title screen: Open Country, Deep Forest, Red Desert, Alpine Ridge, Autumn Woods, Canyonlands, Frozen Tundra (ride across frozen lakes) or Misty Wetlands. Each reshapes the world, ground colours, trees, water, sky and fog and has its own flags.
 
-Pick from seven bikes in the garage: Trail 250, Pit 125, Enduro 450, Rally 500, Supermoto 690, Volt E-MX (electric) and Scrambler 74.
+Pick from ten bikes in the garage: Trail 250, Pit 125, Enduro 450, Rally 500, Supermoto 690, Volt E-MX (electric), Scrambler 74, Trials 300, Factory 450R and Desert Hog 990.
 
 ## Project layout
 

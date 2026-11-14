@@ -101,7 +101,7 @@ function step(dt) {
     return;
   }
   const inp = keys;
-  const terr = terrainH(b.x, b.z), depth = WATER - terr;
+  const terr = terrainH(b.x, b.z), depth = W.ice ? 0 : WATER - terr;
   if (b.grounded) {
     const sy = Math.sin(b.yaw), cy = Math.cos(b.yaw);
     const slopeAng = Math.atan2(groundH(b.x + sy * 0.75, b.z + cy * 0.75) - groundH(b.x - sy * 0.75, b.z - cy * 0.75), 1.5);

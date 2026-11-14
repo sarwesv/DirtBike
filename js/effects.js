@@ -53,7 +53,7 @@ function updParticles(dt) {
   pGeo.attributes.position.needsUpdate = true; pGeo.attributes.color.needsUpdate = true;
 }
 const DUST = L3('#8f7255'), SAND_DUST = L3('#e2c49a'), SPLASH = L3('#eef5fa');
-function dustColor(x, z) { return terrainH(x, z) < WATER ? SPLASH : desertness(x, z) > 0.5 ? SAND_DUST : DUST; }
+function dustColor(x, z) { return W.ice || W.snowLine < 0 ? SPLASH : terrainH(x, z) < WATER ? SPLASH : desertness(x, z) > 0.5 ? SAND_DUST : DUST; }
 function burst(n, power) {
   const c = dustColor(bike.x, bike.z);
   for (let i = 0; i < n; i++) { const a = Math.random() * TAU, s = (1 + Math.random() * 2) * power; emit(bike.x + Math.cos(a) * 0.5, bike.y + 0.15, bike.z + Math.sin(a) * 0.5, Math.cos(a) * s, 1 + Math.random() * 2 * power, Math.sin(a) * s, c); }

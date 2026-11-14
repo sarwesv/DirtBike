@@ -26,7 +26,16 @@ const BIKES = [
     scale: 0.96, top: 33, boostTop: 47, acc: 21, boostAcc: 30, turn: 1.12, air: 1.2, tough: 0.95, electric: true },
   { id: 'scrambler', name: 'Scrambler 74', num: '74', blurb: 'A 1970s classic. Gentle power, soft and forgiving.',
     plastic: '#e8dcc0', plastic2: '#7a3b22', jersey: '#7a3b22', accent: '#d6dade', plateBg: '#f1eadb', plateInk: '#7a3b22', numInk: '#7a3b22',
-    scale: 1.02, top: 29, boostTop: 41, acc: 13, boostAcc: 21, turn: 1.05, air: 0.9, tough: 1.3, vintage: true }
+    scale: 1.02, top: 29, boostTop: 41, acc: 13, boostAcc: 21, turn: 1.05, air: 0.9, tough: 1.3, vintage: true },
+  { id: 'trials', name: 'Trials 300', num: '3', blurb: 'Featherweight trials bike. The ultimate flip machine, slow on the flat.',
+    plastic: '#e43b2c', plastic2: '#f4f1e8', jersey: '#e43b2c', accent: '#c4c9ce', plateBg: '#f4f1e8', plateInk: '#e43b2c', numInk: '#ffffff',
+    scale: 0.94, top: 22, boostTop: 32, acc: 18, boostAcc: 25, turn: 1.4, air: 1.65, tough: 0.9, trials: true },
+  { id: 'factory', name: 'Factory 450R', num: '1', blurb: 'Works race bike. Quick, sharp and composed everywhere.',
+    plastic: '#ff7a00', plastic2: '#1b2a4a', jersey: '#1b2a4a', accent: '#d9a441', plateBg: '#1b2a4a', plateInk: '#ff7a00', numInk: '#ffffff',
+    scale: 1.03, top: 40, boostTop: 54, acc: 20, boostAcc: 30, turn: 1.08, air: 1.08, tough: 1.15 },
+  { id: 'hog', name: 'Desert Hog 990', num: '99', blurb: 'Twin-cylinder adventure tank. Huge top speed, barely leaves the ground.',
+    plastic: '#3f4a3a', plastic2: '#e0b04a', jersey: '#3f4a3a', accent: '#2a2c31', plateBg: '#e0b04a', plateInk: '#1d1d20', numInk: '#1d1d20',
+    scale: 1.16, top: 50, boostTop: 64, acc: 15, boostAcc: 25, turn: 0.72, air: 0.55, tough: 1.55, rally: true }
 ];
 let bikeSpec = BIKES[0];
 // Per-bike colours that are not part of the handling spec.
@@ -37,7 +46,10 @@ const LOOKS = {
   rally:  { frame: '#c4c9ce', pants: '#e9e5da', helmet: '#f1eee6', lens: '#ff5a3c', rim: '#1d1d20' },
   super:  { frame: '#c8323a', pants: '#1e1f23', helmet: '#ffcf33', lens: '#9a6bff', rim: '#ffcf33' },
   volt:   { frame: '#2a2c31', pants: '#2a2c31', helmet: '#e9f1f2', lens: '#7ad8ff', rim: '#1fb8b0' },
-  scrambler: { frame: '#1d1d20', pants: '#3b4a5a', helmet: '#e8dcc0', lens: '#c7a24a', rim: '#d6dade' }
+  scrambler: { frame: '#1d1d20', pants: '#3b4a5a', helmet: '#e8dcc0', lens: '#c7a24a', rim: '#d6dade' },
+  trials: { frame: '#c4c9ce', pants: '#1d1d20', helmet: '#f4f1e8', lens: '#7ad8ff', rim: '#1d1d20' },
+  factory: { frame: '#ff7a00', pants: '#1b2a4a', helmet: '#ff7a00', lens: '#ffd84a', rim: '#d9a441' },
+  hog: { frame: '#2a2c31', pants: '#5a5446', helmet: '#e0b04a', lens: '#ff9a3c', rim: '#2a2c31' }
 };
 function plateTexture(spec, transparent) {
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 96;
@@ -358,7 +370,8 @@ function buildBike(spec) {
     const shroudMat = new THREE.MeshPhysicalMaterial({ map: shroudTexture(spec, 0.04, 0.64, 0.62, 1.08, s > 0), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.08 });
     slab(body, shroudPts, 0.03, shroudMat, s * 0.165, 0.008);
   }
-  slab(body, [[0.14, 0.98], [0.06, 1.05], [-0.3, 1.04], [-0.66, 1.0], [-0.7, 0.95], [-0.3, 0.93], [0.08, 0.92]], 0.25, seatMat, 0, 0.03);
+  if (spec.trials) slab(body, [[-0.42, 0.96], [-0.46, 1.0], [-0.72, 0.99], [-0.76, 0.95], [-0.5, 0.93]], 0.18, seatMat, 0, 0.02); // trials: tiny perch, riders stand
+  else slab(body, [[0.14, 0.98], [0.06, 1.05], [-0.3, 1.04], [-0.66, 1.0], [-0.7, 0.95], [-0.3, 0.93], [0.08, 0.92]], 0.25, seatMat, 0, 0.03);
   slab(body, [[-0.28, 0.93], [-0.7, 0.97], [-1.06, 1.04], [-1.1, 1.0], [-0.7, 0.92], [-0.36, 0.87]], 0.21, plastic, 0, 0.01);
   for (const s of [-1, 1]) {
     slab(body, [[-0.12, 0.92], [-0.62, 0.97], [-0.64, 0.8], [-0.26, 0.7]], 0.03, plateMat, s * 0.13, 0.008);
@@ -461,7 +474,7 @@ function renderGarage() {
     btn.setAttribute('aria-pressed', String(b.id === bikeSpec.id));
     btn.style.setProperty('--c', b.plastic); btn.style.setProperty('--n', b.numInk);
     btn.innerHTML = `<span class="swatch">${b.num}</span><span class="bname">${b.name}</span><span class="blurb">${b.blurb}</span>` +
-      `<span class="bars">${stat('Speed', b.top / 46)}${stat('Accel', (b.acc - 11) / 10)}${stat('Handling', b.turn / 1.3)}${stat('Air', b.air / 1.45)}</span>`;
+      `<span class="bars">${stat('Speed', b.top / 50)}${stat('Accel', (b.acc - 11) / 10)}${stat('Handling', b.turn / 1.3)}${stat('Air', b.air / 1.65)}</span>`;
     btn.addEventListener('click', () => setBike(b.id));
     wrap.appendChild(btn);
   }

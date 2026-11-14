@@ -6,6 +6,7 @@
 /* ---------- World shape ---------- */
 const WATER = 0, CELL = 4, CN = 50, CS = CELL * CN, VIEW_R = 2;
 /* Maps. Each one reshapes the same noise world: biome mix, mountain size, tree count, snow line and sky. */
+const WORLD_DEFAULTS = { hills: 1, terrace: 0, oak: 0.42, oakMax: 32, foliage: 'summer', ice: false, tint: [1, 1, 1], pal: {}, water: { deep: '#1d4f68', shallow: '#3b8aa0', ice: 0 } };
 const WORLDS = [
   { id: 'open', name: 'Open Country', blurb: 'Meadows, pine stands, desert edges, lakes and snowy ridges.', swatch: '#7fa64a',
     desert: null, mount: 1, mountCover: 0, base: 0, forest: 0, trees: 120, bushes: 70, snowLine: 60, treeLine: 64,
@@ -19,7 +20,24 @@ const WORLDS = [
   { id: 'alpine', name: 'Alpine Ridge', blurb: 'Big mountains, snowfields and steep pine slopes.', swatch: '#dfe8ee',
     desert: 0, mount: 1.6, mountCover: 0.28, base: 4, forest: 0.1, trees: 170, bushes: 40, snowLine: 36, treeLine: 46,
     fog: 0.001, horizon: '#d2dce3', top: '#2c6cb4', below: '#a6b1b6', sun: '#ffffff' }
-];
+,
+  { id: 'autumn', name: 'Autumn Woods', blurb: 'Red and gold hardwoods over leaf-strewn hills.', swatch: '#c8642a',
+    desert: 0, mount: 0.6, mountCover: 0, base: 2, forest: 0.35, trees: 300, bushes: 110, snowLine: 95, treeLine: 85,
+    fog: 0.0016, horizon: '#e4d5bf', top: '#5a8cc0', below: '#9b8a70', sun: '#ffe2b0', oak: 0.8, oakMax: 70, foliage: 'autumn',
+    pal: { grassA: '#5c5a2c', grassB: '#7a6630', dry: '#8f5a30', dirt: '#6e4a2a', forest: '#7a3c1c' } },
+  { id: 'canyon', name: 'Canyonlands', blurb: 'Stepped red-rock mesas, sandstone walls and sandy washes.', swatch: '#b9542e',
+    desert: 1, mount: 1.25, mountCover: 0.18, base: 6, forest: -1, trees: 90, bushes: 0, snowLine: 300, treeLine: 300, hills: 1.15, terrace: 0.85,
+    fog: 0.0008, horizon: '#ebcaa6', top: '#3f86c8', below: '#c08e66', sun: '#fff0d0',
+    pal: { dune: '#c9733e', duneB: '#a8552d', sand: '#d79a62', rock: '#a4553a', rockB: '#7c3b28', dirt: '#9a5a35' } },
+  { id: 'tundra', name: 'Frozen Tundra', blurb: 'Snowfields, frosted pines and frozen lakes you can ride across.', swatch: '#e6f0f6',
+    desert: 0, mount: 0.9, mountCover: 0.05, base: 1, forest: -0.1, trees: 110, bushes: 20, snowLine: -60, treeLine: 70,
+    fog: 0.0019, horizon: '#dde6ee', top: '#6d97c4', below: '#b8c4cc', sun: '#f4f8ff', ice: true, foliage: 'frost', tint: [1.05, 1.08, 1.12],
+    water: { deep: '#a9c8d8', shallow: '#d6e8f0', ice: 1 }, pal: { rock: '#7d8590', rockB: '#59606a', snow: '#eef3f8', dirt: '#6d6560' } },
+  { id: 'swamp', name: 'Misty Wetlands', blurb: 'Low marsh, winding channels and mossy trees in the fog.', swatch: '#4d6a3a',
+    desert: 0, mount: 0.15, mountCover: 0, base: -1.2, hills: 0.55, forest: 0.15, trees: 200, bushes: 160, snowLine: 200, treeLine: 60,
+    fog: 0.0032, horizon: '#aebaa8', top: '#7b98a8', below: '#7c8a74', sun: '#f0ead2', oak: 0.7, oakMax: 60, tint: [0.72, 0.82, 0.66],
+    water: { deep: '#2a3624', shallow: '#4c5d36', ice: 0 }, pal: { grassA: '#3b5a24', grassB: '#55722c', dry: '#6f7a3a', sand: '#7c7350', wet: '#5a5638', bed: '#3d3a28' } }
+].map(w => Object.assign({}, WORLD_DEFAULTS, w));
 let W = WORLDS[0];
 // Open Country keeps the original flag ids so earlier saves still count.
 const flagPrefix = () => W.id === 'open' ? '' : W.id + '/';
@@ -56,7 +74,7 @@ function mountainAt(x, z) {
 const trailAt = (x, z) => trailDistS(x, z, mountainAt(x, z));
 let lastTrailD = 99;
 function rawHeight(x, z) {
-  const hills = fbm(x * 0.0032 + 11.3, z * 0.0032 - 7.7, 4) * 24;
+  const hills = fbm(x * 0.0032 + 11.3, z * 0.0032 - 7.7, 4) * 24 * W.hills;
   const mm = mountainMask(x, z);
   let mount = 0;
   if (mm > 0) { const r = 1 - Math.abs(fbm(x * 0.0026 + 3.1, z * 0.0026 + 9.4, 3)); mount = mm * r * r * r * 95 * W.mount; }
@@ -65,6 +83,11 @@ function rawHeight(x, z) {
   if (des > 0) dunes = des * (Math.sin(x * 0.05 + z * 0.018 + noise(x * 0.008, z * 0.008) * 4) * 0.5 + 0.5) * 3.2;
   const bumps = noise(x * 0.07 + .5, z * 0.07 + .5) * 0.45;
   let h = 6 + W.base + hills + mount + dunes + bumps, hs = 6 + W.base + hills + mount + dunes * 0.4;
+  if (W.terrace) {
+    // Mesas: squeeze height into flat benches separated by steep sandstone steps.
+    const step = 7, q = (hs - W.base) / step, k = Math.floor(q), f = q - k, t = (k + smooth(0.55, 0.92, f)) * step + W.base;
+    const dh = (t - hs) * W.terrace; h += dh; hs += dh;
+  }
   const d2 = x * x + z * z;
   let padK = 1;
   if (d2 < 170 * 170) { padK = smooth(90, 170, Math.sqrt(d2)); h = lerp(9 + W.base + bumps * 0.4, h, padK); hs = lerp(9 + W.base, hs, padK); }
@@ -137,9 +160,9 @@ function getChunkData(cx, cz) {
     if (des > 0.55) {
       if (r < (W.desert === 1 ? 0.11 : 0.07)) { const sc = 0.8 + s * 0.6; const o = { x, z, y: terrainH(x, z) - 0.1, s: sc, rot, tint }; d.cacti.push(o); d.obs.push({ x, z, y: o.y, r: 0.42 * sc, top: 3.2 * sc, kind: 'cactus' }); }
     } else if (r < forestness(x, z) * 0.75 + 0.025) {
-      const oak = tint < 0.42 && h < 32;
+      const oak = tint < W.oak && h < W.oakMax;
       const sc = oak ? 0.85 + s * 0.5 : 0.8 + s * 0.7;
-      const o = { x, z, y: terrainH(x, z) - 0.15, s: sc, rot, tint: oak ? tint / 0.42 : tint };
+      const o = { x, z, y: terrainH(x, z) - 0.15, s: sc, rot, tint: oak ? tint / W.oak : tint };
       (oak ? d.oaks : d.trees).push(o);
       d.obs.push({ x, z, y: o.y, r: (oak ? 0.42 : 0.38) * sc, top: 6.5 * sc, kind: 'tree' });
     }
@@ -186,6 +209,7 @@ function rampsAround(x, z) {
 function refreshNearRamps(x, z) { nearRamps = rampsAround(x, z); }
 function groundH(x, z) {
   let h = terrainH(x, z);
+  if (W.ice && h < WATER) h = WATER; // frozen lakes carry the bike
   for (const r of nearRamps) { const rh = rampH(r, x, z); if (rh > h) h = rh; }
   return h;
 }

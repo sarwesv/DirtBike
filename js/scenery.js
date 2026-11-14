@@ -43,6 +43,20 @@ const OAK = mergeParts([
   [lumpy(new THREE.IcosahedronGeometry(1.25, 1), 0.3, 3), '#44742c', mtx(-1.0, 3.55, -0.3)],
   [lumpy(new THREE.IcosahedronGeometry(1.05, 1), 0.3, 4), '#64983f', mtx(0.2, 4.85, -0.4)]
 ]);
+const OAK_AUTUMN = mergeParts([
+  [new THREE.CylinderGeometry(0.2, 0.34, 2.6, 7), '#6a4a30', mtx(0, 1.3, 0)],
+  [lumpy(new THREE.IcosahedronGeometry(1.7, 1), 0.3, 1), '#c0602a', mtx(0, 3.9, 0)],
+  [lumpy(new THREE.IcosahedronGeometry(1.2, 1), 0.3, 2), '#d99a34', mtx(1.15, 3.4, 0.35)],
+  [lumpy(new THREE.IcosahedronGeometry(1.25, 1), 0.3, 3), '#a63d22', mtx(-1.0, 3.55, -0.3)],
+  [lumpy(new THREE.IcosahedronGeometry(1.05, 1), 0.3, 4), '#c9a640', mtx(0.2, 4.85, -0.4)]
+]);
+const PINE_FROST = mergeParts([
+  [new THREE.CylinderGeometry(0.16, 0.28, 2.2, 7), '#5e412a', mtx(0, 1.1, 0)],
+  [new THREE.ConeGeometry(1.95, 2.6, 9), '#5d7a66', mtx(0, 2.5, 0)],
+  [new THREE.ConeGeometry(1.6, 2.3, 9), '#93a99c', mtx(0, 3.6, 0, 0, 0.35, 0)],
+  [new THREE.ConeGeometry(1.2, 2.0, 9), '#c3d1ca', mtx(0, 4.65, 0, 0, 0.7, 0)],
+  [new THREE.ConeGeometry(0.72, 1.6, 8), '#e6eeec', mtx(0, 5.7, 0, 0, 0.2, 0)]
+]);
 const BUSH = mergeParts([
   [lumpy(new THREE.IcosahedronGeometry(0.8, 1), 0.35, 5), '#4c7a2e', mtx(0, 0.45, 0)],
   [lumpy(new THREE.IcosahedronGeometry(0.6, 1), 0.35, 6), '#5d8c37', mtx(0.55, 0.35, 0.2)],
@@ -81,7 +95,7 @@ instMat.onBeforeCompile = swayPatch;
 /* ---------- Detailed foliage: alpha-tested leaf and needle cards ---------- */
 // Atlas regions [u0, v0, u1, v1]. Canvas top is v = 1.
 const ATLAS = { bark: [0, 0.5, 0.5, 1], oak: [0, 0, 0.5, 0.5], pine: [0.5, 0, 1, 0.5], bush: [0.5, 0.5, 1, 1] };
-function makeFoliageAtlas() {
+function makeFoliageAtlas(variant = 'summer') {
   const S = 1024, cv = document.createElement('canvas'); cv.width = cv.height = S;
   const x = cv.getContext('2d'), rnd = mulberry32(31);
   const rgba = (r, g, b, a = 1) => `rgba(${r | 0},${g | 0},${b | 0},${a})`;
@@ -95,12 +109,16 @@ function makeFoliageAtlas() {
     x.strokeStyle = 'rgba(25,45,12,0.35)'; x.lineWidth = 1; x.beginPath(); x.moveTo(0, 0); x.lineTo(len * 0.9, 0); x.stroke();
     x.restore();
   };
+  // Autumn mixes reds, oranges and golds with a few late greens; frost dusts the tops of leaves white.
+  const AUTUMN = [[236, 102, 34], [250, 168, 46], [206, 58, 32], [240, 196, 66], [150, 132, 48]];
   const cluster = (ox, oy, n, size, base) => {
     x.save(); x.beginPath(); x.rect(ox, oy, 512, 512); x.clip();
     for (let i = 0; i < n; i++) {
       const a = rnd() * TAU, r = Math.sqrt(rnd()) * 232, depth = 1 - r / 232, s = rnd();
-      leaf(ox + 256 + Math.cos(a) * r, oy + 256 + Math.sin(a) * r, size * (0.7 + rnd() * 0.6), rnd() * TAU,
-        rgb3(base, 0.55 + depth * 0.25 + s * 0.35));
+      const col = variant === 'autumn' ? AUTUMN[Math.floor(rnd() * AUTUMN.length)] : base;
+      const cx = ox + 256 + Math.cos(a) * r, cy = oy + 256 + Math.sin(a) * r;
+      leaf(cx, cy, size * (0.7 + rnd() * 0.6), rnd() * TAU, rgb3(col, 0.55 + depth * 0.25 + s * 0.35));
+      if (variant === 'frost' && rnd() < 0.35) { x.fillStyle = 'rgba(240,246,252,0.85)'; x.beginPath(); x.arc(cx, cy - 3, size * 0.25, 0, TAU); x.fill(); }
     }
     x.restore();
   };
@@ -117,6 +135,10 @@ function makeFoliageAtlas() {
     x.beginPath(); x.moveTo(px, sy); x.lineTo(px + len * 0.45, sy + Math.sin(a) * len); x.stroke();
   }
   x.strokeStyle = '#4a3524'; x.lineWidth = 6; x.beginPath(); x.moveTo(512, by); x.lineTo(1000, by); x.stroke();
+  if (variant === 'frost') for (let i = 0; i < 700; i++) {
+    const t = rnd(), px = 520 + t * 470, w = (1 - t * 0.6) * 90;
+    x.fillStyle = `rgba(242,247,252,${0.6 + rnd() * 0.35})`; x.beginPath(); x.ellipse(px, by - rnd() * w * 0.5, 4 + rnd() * 9, 2 + rnd() * 4, 0, 0, TAU); x.fill();
+  }
   x.restore();
   const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; t.anisotropy = renderer.capabilities.getMaxAnisotropy();
   return t;
@@ -196,14 +218,16 @@ const OAK_CARDS = cardGeo(api => {
 const BUSH_CARDS = cardGeo(api => {
   canopy(api, [[0, 0.55, 0, 0.85], [0.55, 0.45, 0.25, 0.6], [-0.5, 0.4, -0.25, 0.58]], ATLAS.bush, mulberry32(79), 16, 0.45);
 });
-const foliageAtlas = makeFoliageAtlas();
+const foliageAtlases = {};
+const foliageAtlasFor = v => foliageAtlases[v] || (foliageAtlases[v] = makeFoliageAtlas(v));
+const foliageAtlas = foliageAtlasFor('summer');
 const foliageMat = new THREE.MeshStandardMaterial({ map: foliageAtlas, vertexColors: true, alphaTest: 0.42, side: THREE.DoubleSide, roughness: 0.8, metalness: 0, envMapIntensity: 0.85 });
 foliageMat.onBeforeCompile = sh => {
   swayPatch(sh);
   // Both faces of a card share the canopy normal, and a little light leaks through the leaves.
   sh.fragmentShader = sh.fragmentShader
     .replace('#include <normal_fragment_begin>', 'float faceDirection = 1.0;\nvec3 normal = normalize(vNormal);\nvec3 geometryNormal = normal;')
-    .replace('vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;', 'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance + diffuseColor.rgb * vec3(0.05, 0.07, 0.03);');
+    .replace('vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;', 'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance + diffuseColor.rgb * vec3(0.09, 0.09, 0.06);');
 };
 const foliageDepth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: foliageAtlas, alphaTest: 0.42, side: THREE.DoubleSide });
 // Near chunks get leafy card trees; far chunks keep the cheap solid ones. Phones always use the solid ones.
@@ -364,9 +388,9 @@ function buildChunk(cx, cz) {
   group.add(terrain);
   const d = getChunkData(cx, cz);
   const inst = [
-    makeInst(PINE, d.trees, (col, t) => col.setRGB(0.82 + t * 0.3, 0.86 + t * 0.22, 0.8 + t * 0.2), instMat, true, PINE_CARDS),
-    makeInst(OAK, d.oaks, (col, t) => col.setRGB(0.85 + t * 0.35, 0.88 + t * 0.2, 0.8 + t * 0.1), instMat, true, OAK_CARDS),
-    makeInst(BUSH, d.bushes, (col, t) => col.setRGB(0.85 + t * 0.3, 0.9 + t * 0.2, 0.85), instMat, true, BUSH_CARDS),
+    makeInst(W.foliage === 'frost' ? PINE_FROST : PINE, d.trees, (col, t) => col.setRGB((0.82 + t * 0.3) * W.tint[0], (0.86 + t * 0.22) * W.tint[1], (0.8 + t * 0.2) * W.tint[2]), instMat, true, PINE_CARDS),
+    makeInst(W.foliage === 'autumn' ? OAK_AUTUMN : OAK, d.oaks, (col, t) => col.setRGB((0.85 + t * 0.35) * W.tint[0], (0.88 + t * 0.2) * W.tint[1], (0.8 + t * 0.1) * W.tint[2]), instMat, true, OAK_CARDS),
+    makeInst(BUSH, d.bushes, (col, t) => col.setRGB((0.85 + t * 0.3) * W.tint[0], (0.9 + t * 0.2) * W.tint[1], 0.85 * W.tint[2]), instMat, true, BUSH_CARDS),
     makeInst(CACTUS, d.cacti, (col, t) => col.setRGB(0.9 + t * 0.2, 0.9 + t * 0.15, 0.85)),
     makeInst(ROCK, d.rocks, (col, t) => col.setRGB(0.85 + t * 0.3, 0.83 + t * 0.28, 0.8 + t * 0.26), rockMat)
   ].filter(Boolean);

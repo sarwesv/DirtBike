@@ -100,6 +100,10 @@ buildEnv();
 // Repaint sky, fog and image lighting for the current map.
 const SKY_AIR = {
   open:   { turbidity: 6, rayleigh: 1.6, mie: 0.004 },
+  autumn: { turbidity: 8, rayleigh: 1.5, mie: 0.005 },
+  canyon: { turbidity: 10, rayleigh: 1.4, mie: 0.006 },
+  tundra: { turbidity: 3, rayleigh: 2.0, mie: 0.004 },
+  swamp:  { turbidity: 14, rayleigh: 1.1, mie: 0.009 },
   forest: { turbidity: 9, rayleigh: 1.3, mie: 0.006 },
   desert: { turbidity: 12, rayleigh: 1.1, mie: 0.007 },
   alpine: { turbidity: 2.5, rayleigh: 2.2, mie: 0.003 }
@@ -112,6 +116,10 @@ function applyWorldLook() {
   const air = SKY_AIR[W.id] || SKY_AIR.open, u = skyMat.uniforms;
   u.turbidity.value = air.turbidity; u.rayleigh.value = air.rayleigh; u.mieCoefficient.value = air.mie;
   sun.color.copy(lin(W.sun));
+  setPalette(W.pal);
+  if (typeof foliageMat !== 'undefined') { const a = foliageAtlasFor(W.foliage); foliageMat.map = a; foliageDepth.map = a; foliageMat.needsUpdate = true; foliageDepth.needsUpdate = true; }
+  waterMat.uniforms.uDeep.value.copy(lin(W.water.deep)); waterMat.uniforms.uShallow.value.copy(lin(W.water.shallow));
+  waterMat.uniforms.uIce.value = W.water.ice;
   buildEnv();
 }
 
@@ -130,7 +138,7 @@ scene.add(sun, sun.target);
 const waterMat = new THREE.ShaderMaterial({
   transparent: true, fog: true, depthWrite: false,
   uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-    uTime: { value: 0 }, uDeep: { value: lin('#1d4f68') }, uShallow: { value: lin('#3b8aa0') }, uSky: { value: lin('#c4d7e2') }, uSun: { value: SUN_DIR }
+    uTime: { value: 0 }, uDeep: { value: lin('#1d4f68') }, uShallow: { value: lin('#3b8aa0') }, uSky: { value: lin('#c4d7e2') }, uSun: { value: SUN_DIR }, uIce: { value: 0 }
   }]),
   vertexShader: [
     'varying vec3 vW;',
@@ -142,11 +150,11 @@ const waterMat = new THREE.ShaderMaterial({
     '}'
   ].join('\n'),
   fragmentShader: [
-    'uniform float uTime; uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uSky; uniform vec3 uSun; varying vec3 vW;',
+    'uniform float uTime; uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uSky; uniform vec3 uSun; uniform float uIce; varying vec3 vW;',
     '#include <common>',
     '#include <fog_pars_fragment>',
     'void main(){',
-    '  vec2 p = vW.xz; float t = uTime;',
+    '  vec2 p = vW.xz; float t = uTime * (1.0 - uIce);',
     '  vec3 n = vec3(0.0, 1.0, 0.0);',
     '  n.x += sin(p.x * 0.31 + t * 1.2) * 0.035 + sin(p.x * 1.1 + p.y * 0.7 + t * 2.1) * 0.022 + sin(p.y * 2.7 - p.x * 1.9 + t * 3.3) * 0.012;',
     '  n.z += cos(p.y * 0.27 + t * 1.0) * 0.035 + sin(p.y * 1.3 - p.x * 0.6 + t * 1.7) * 0.022 + cos(p.x * 2.3 + p.y * 2.1 + t * 2.9) * 0.012;',
@@ -158,7 +166,13 @@ const waterMat = new THREE.ShaderMaterial({
     '  vec3 col = mix(uShallow, uDeep, 0.55 + 0.25 * sin(p.x * 0.01 + p.y * 0.013));',
     '  col = mix(col, refl, clamp(fres * 1.4, 0.0, 1.0));',
     '  col += vec3(1.0, 0.94, 0.82) * pow(max(dot(r, uSun), 0.0), 220.0) * 4.0;',
-    '  gl_FragColor = vec4(col, mix(0.7, 0.98, fres));',
+    // Ice: frosted, cracked and nearly opaque, with frozen ripples instead of moving ones.
+    '  if (uIce > 0.0) {',
+    '    float cr = abs(sin(p.x * 0.37 + sin(p.y * 0.21) * 3.0)) * abs(sin(p.y * 0.29 + sin(p.x * 0.17) * 2.0));',
+    '    vec3 ice = mix(uShallow, uDeep, 0.5 + 0.5 * sin(p.x * 0.05 + p.y * 0.04)) * (0.92 + smoothstep(0.0, 0.08, cr) * 0.1);',
+    '    col = mix(col, ice + refl * fres * 0.6, uIce);',
+    '  }',
+    '  gl_FragColor = vec4(col, mix(mix(0.7, 0.98, fres), 0.97, uIce));',
     '  #include <tonemapping_fragment>',
     '  #include <encodings_fragment>',
     '  #include <fog_fragment>',
@@ -291,10 +305,14 @@ const detailOnly = sh => {
 
 /* ---------- Terrain colouring (linear colour space) ---------- */
 const L3 = hex => { const c = lin(hex); return [c.r, c.g, c.b]; };
-const COL = {
-  bed: L3('#6d6a4c'), wet: L3('#9f9168'), sand: L3('#dcc893'), grassA: L3('#46712a'), grassB: L3('#6c9436'), dry: L3('#a39a52'),
-  dirt: L3('#8a613b'), rock: L3('#8c8579'), rockB: L3('#625c55'), snow: L3('#f4f7f9'), dune: L3('#e3b06d'), duneB: L3('#c98c50'), forest: L3('#2c4524')
+const BASE_COL = {
+  bed: '#6d6a4c', wet: '#9f9168', sand: '#dcc893', grassA: '#46712a', grassB: '#6c9436', dry: '#a39a52',
+  dirt: '#8a613b', rock: '#8c8579', rockB: '#625c55', snow: '#f4f7f9', dune: '#e3b06d', duneB: '#c98c50', forest: '#2c4524'
 };
+const COL = {};
+// Each map can override any ground colour.
+function setPalette(pal) { for (const k in BASE_COL) COL[k] = L3(pal[k] || BASE_COL[k]); }
+setPalette({});
 function mix3(a, b, t, o) { o[0] = a[0] + (b[0] - a[0]) * t; o[1] = a[1] + (b[1] - a[1]) * t; o[2] = a[2] + (b[2] - a[2]) * t; return o; }
 const tmpA = [0, 0, 0], tmpB = [0, 0, 0];
 let lastGrass = 0;
