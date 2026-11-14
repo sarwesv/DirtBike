@@ -18,8 +18,12 @@ function syncBike(dt) {
   const lean = b.crashed ? 0.5 : b.grounded ? (keys.up ? 0.16 : 0.05) - b.wheelie * 0.5 : 0.1 - b.pitchVel * 0.03;
   b.riderLean = lerp(b.riderLean || 0, lean, damp(5, dt));
   // Brace into landings: the rider sinks and pitches forward with the suspension.
-  m.rider.rotation.set(b.riderLean + Math.max(0, b.susp) * 1.6, 0, b.lean * 0.35 - (b.grounded ? 0 : (b.whip || 0)) * 0.4);
-  m.rider.position.y = 1.02 - Math.max(0, b.susp) * 0.8;
+  // Stand up in the air, on landings and on the trials bike; sit when cruising.
+  const standT = bikeSpec.trials || !b.grounded || b.crashed ? 1 : Math.abs(b.speed) > 22 && keys.up ? 0.5 : 0;
+  b.stand = lerp(b.stand || 0, standT, damp(4, dt));
+  m.rider.rotation.set(b.riderLean + b.stand * 0.22 + Math.max(0, b.susp) * 1.6, 0, b.lean * 0.35 - (b.grounded ? 0 : (b.whip || 0)) * 0.4);
+  m.rider.position.set(0, 1.02 + b.stand * 0.2 - Math.max(0, b.susp) * 0.8, -0.2 + b.stand * 0.06);
+  poseRider(m);
   const target = b.grounded ? b.speed : (keys.up ? 30 : b.spinW * 0.98);
   b.spinW = b.grounded ? b.speed : lerp(b.spinW, target, damp(2, dt));
   const rw = R_WHEEL * bikeSpec.scale;

@@ -119,6 +119,7 @@ function buildGhost(bikeId) {
   const spec = BIKES.find(b => b.id === bikeId) || BIKES[0], m = buildBike(spec);
   const mat = new THREE.MeshStandardMaterial({ color: lin('#9fdcff'), emissive: lin('#3a8fd0'), emissiveIntensity: 0.6, transparent: true, opacity: 0.32, depthWrite: false });
   m.root.traverse(o => { if (o.isMesh) { o.material = mat; o.castShadow = false; } });
+  poseRider(m);
   return m;
 }
 function updateGateLook() {
