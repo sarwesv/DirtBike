@@ -59,7 +59,7 @@ const CACTUS = mergeParts([
 const ROCK = mergeParts([[lumpy(new THREE.DodecahedronGeometry(1, 1), 0.4, 8), '#8d867b', mtx(0, 0, 0)]]);
 const instMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0, envMapIntensity: 0.7 });
 // Trees and bushes lean with the same gusts as the grass; the trunk base stays planted.
-instMat.onBeforeCompile = sh => {
+const swayPatch = sh => {
   sh.uniforms.uTime = grassU.uTime;
   sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <project_vertex>', [
     'vec4 mvPosition = vec4(transformed, 1.0);',
@@ -76,14 +76,147 @@ instMat.onBeforeCompile = sh => {
     'gl_Position = projectionMatrix * mvPosition;'
   ].join('\n'));
 };
+instMat.onBeforeCompile = swayPatch;
+
+/* ---------- Detailed foliage: alpha-tested leaf and needle cards ---------- */
+// Atlas regions [u0, v0, u1, v1]. Canvas top is v = 1.
+const ATLAS = { bark: [0, 0.5, 0.5, 1], oak: [0, 0, 0.5, 0.5], pine: [0.5, 0, 1, 0.5], bush: [0.5, 0.5, 1, 1] };
+function makeFoliageAtlas() {
+  const S = 1024, cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const x = cv.getContext('2d'), rnd = mulberry32(31);
+  const rgba = (r, g, b, a = 1) => `rgba(${r | 0},${g | 0},${b | 0},${a})`;
+  // Bark: furrowed vertical streaks.
+  x.fillStyle = '#5a4433'; x.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 320; i++) { x.fillStyle = rgba(25 + rnd() * 40, 18 + rnd() * 26, 10 + rnd() * 16, 0.3 + rnd() * 0.45); x.fillRect(rnd() * 512, 0, 2 + rnd() * 7, 512); }
+  for (let i = 0; i < 600; i++) { x.fillStyle = rgba(170, 140, 110, rnd() * 0.14); x.fillRect(rnd() * 512, rnd() * 512, 1 + rnd() * 3, 6 + rnd() * 26); }
+  const leaf = (cx, cy, len, ang, col) => {
+    x.save(); x.translate(cx, cy); x.rotate(ang); x.fillStyle = col;
+    x.beginPath(); x.moveTo(0, 0); x.quadraticCurveTo(len * 0.5, -len * 0.34, len, 0); x.quadraticCurveTo(len * 0.5, len * 0.34, 0, 0); x.fill();
+    x.strokeStyle = 'rgba(25,45,12,0.35)'; x.lineWidth = 1; x.beginPath(); x.moveTo(0, 0); x.lineTo(len * 0.9, 0); x.stroke();
+    x.restore();
+  };
+  const cluster = (ox, oy, n, size, base) => {
+    x.save(); x.beginPath(); x.rect(ox, oy, 512, 512); x.clip();
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * TAU, r = Math.sqrt(rnd()) * 232, depth = 1 - r / 232, s = rnd();
+      leaf(ox + 256 + Math.cos(a) * r, oy + 256 + Math.sin(a) * r, size * (0.7 + rnd() * 0.6), rnd() * TAU,
+        rgb3(base, 0.55 + depth * 0.25 + s * 0.35));
+    }
+    x.restore();
+  };
+  const rgb3 = (b, k) => rgba(b[0] * k, b[1] * k, b[2] * k);
+  cluster(0, 512, 1100, 30, [78, 128, 46]);   // oak
+  cluster(512, 0, 900, 24, [92, 136, 52]);    // bush
+  // Pine: a branch running left to right with needle sprays along it.
+  x.save(); x.beginPath(); x.rect(512, 512, 512, 512); x.clip();
+  const by = 768;
+  for (let i = 0; i < 3400; i++) {
+    const t = rnd(), px = 520 + t * 480, spread = (1 - t * 0.6) * 200, len = (0.35 + rnd() * 0.65) * spread * 0.5;
+    const sy = by + (rnd() - 0.5) * spread * 0.55, a = (rnd() < 0.5 ? -1 : 1) * (0.45 + rnd() * 0.9);
+    x.strokeStyle = rgba(18 + rnd() * 22, 52 + rnd() * 55, 26 + rnd() * 22, 0.95); x.lineWidth = 1.4 + rnd() * 1.6;
+    x.beginPath(); x.moveTo(px, sy); x.lineTo(px + len * 0.45, sy + Math.sin(a) * len); x.stroke();
+  }
+  x.strokeStyle = '#4a3524'; x.lineWidth = 6; x.beginPath(); x.moveTo(512, by); x.lineTo(1000, by); x.stroke();
+  x.restore();
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+// Builds one geometry from textured quads and atlas-mapped meshes (trunks, branches).
+function cardGeo(build) {
+  const P = [], N = [], U = [], C = [];
+  const api = {
+    quad(c, ax, ay, n, reg, col = [1, 1, 1]) {
+      const cs = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+      const vs = cs.map(([a, b]) => c.clone().addScaledVector(ax, a).addScaledVector(ay, b));
+      const uv = cs.map(([a, b]) => [lerp(reg[0], reg[2], (a + 1) / 2), lerp(reg[1], reg[3], (b + 1) / 2)]);
+      for (const i of [0, 1, 2, 0, 2, 3]) { P.push(vs[i].x, vs[i].y, vs[i].z); N.push(n.x, n.y, n.z); U.push(uv[i][0], uv[i][1]); C.push(...col); }
+    },
+    mesh(geo, reg, col = [1, 1, 1]) {
+      const g = geo.index ? geo.toNonIndexed() : geo, p = g.attributes.position, nn = g.attributes.normal, uv = g.attributes.uv;
+      for (let i = 0; i < p.count; i++) {
+        P.push(p.getX(i), p.getY(i), p.getZ(i)); N.push(nn.getX(i), nn.getY(i), nn.getZ(i));
+        U.push(lerp(reg[0], reg[2], uv.getX(i)), lerp(reg[1], reg[3], uv.getY(i))); C.push(...col);
+      }
+    }
+  };
+  build(api);
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+  out.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  out.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  return out;
+}
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const limbGeo = (a, b, r0, r1) => {
+  const va = V3(...a), dir = V3(...b).sub(va), len = dir.length();
+  const g = new THREE.CylinderGeometry(r1, r0, len, 7, 1, true).translate(0, len / 2, 0);
+  g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), dir.normalize()))); g.translate(va.x, va.y, va.z);
+  return g;
+};
+// Leaf clumps scattered over a few canopy spheres. Normals point out from each sphere, so the canopy
+// shades like a soft volume instead of a pile of flat cards.
+function canopy(api, blobs, reg, rnd, density, size) {
+  for (const [cx, cy, cz, r] of blobs) {
+    const n = Math.round(r * r * density);
+    for (let i = 0; i < n; i++) {
+      const u = rnd() * 2 - 1, a = rnd() * TAU, s = Math.sqrt(1 - u * u);
+      const dir = V3(Math.cos(a) * s, Math.abs(u) * 0.8 + u * 0.2, Math.sin(a) * s).normalize();
+      const c = V3(cx, cy, cz).addScaledVector(dir, r * (0.45 + rnd() * 0.55));
+      const t1 = V3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).cross(dir).normalize(), t2 = dir.clone().cross(t1);
+      const q = size * (0.75 + rnd() * 0.5);
+      api.quad(c, t1.multiplyScalar(q), t2.multiplyScalar(q), dir.clone().add(V3(0, 0.35, 0)).normalize(), reg);
+    }
+  }
+}
+const PINE_CARDS = cardGeo(api => {
+  const rnd = mulberry32(77);
+  api.mesh(new THREE.CylinderGeometry(0.1, 0.3, 6.8, 8, 1, true).translate(0, 3.4, 0), ATLAS.bark);
+  const tiers = 10;
+  for (let k = 0; k < tiers; k++) {
+    const t = k / (tiers - 1), y = 1.5 + t * 5.0, R = lerp(2.4, 0.5, t), n = Math.round(lerp(8, 4, t));
+    for (let i = 0; i < n; i++) {
+      const a = (i / n + k * 0.37 + rnd() * 0.1) * TAU, droop = -0.22 - rnd() * 0.18 + t * 0.15;
+      const dir = V3(Math.cos(a), droop, Math.sin(a)).normalize(), len = R * (0.85 + rnd() * 0.3);
+      const c = V3(0, y, 0).addScaledVector(dir, len / 2), side = V3(-Math.sin(a), 0, Math.cos(a));
+      const nrm = V3(Math.cos(a) * 0.55, 0.85, Math.sin(a) * 0.55).normalize();
+      api.quad(c, dir.clone().multiplyScalar(len / 2), side.clone().multiplyScalar(len * 0.42).add(V3(0, len * 0.06, 0)), nrm, ATLAS.pine);
+      api.quad(c, dir.clone().multiplyScalar(len / 2), V3(0, len * 0.3, 0).addScaledVector(side, len * 0.08), nrm, ATLAS.pine);
+    }
+  }
+  for (let i = 0; i < 2; i++) { const a = i * Math.PI / 2; api.quad(V3(0, 6.9, 0), V3(0, 0.6, 0), V3(Math.cos(a) * 0.35, 0, Math.sin(a) * 0.35), V3(0, 1, 0), ATLAS.pine); }
+});
+const OAK_CARDS = cardGeo(api => {
+  const rnd = mulberry32(78);
+  api.mesh(new THREE.CylinderGeometry(0.2, 0.36, 3.2, 9, 1, true).translate(0, 1.6, 0), ATLAS.bark);
+  const blobs = [[0, 4.2, 0, 1.9], [1.3, 3.7, 0.4, 1.35], [-1.15, 3.8, -0.35, 1.45], [0.25, 5.2, -0.45, 1.25], [-0.35, 3.4, 1.1, 1.15]];
+  for (const b of blobs.slice(1)) api.mesh(limbGeo([0, 2.7, 0], [b[0] * 0.8, b[1] - 0.3, b[2] * 0.8], 0.14, 0.06), ATLAS.bark);
+  canopy(api, blobs, ATLAS.oak, rnd, 13, 0.85);
+});
+const BUSH_CARDS = cardGeo(api => {
+  canopy(api, [[0, 0.55, 0, 0.85], [0.55, 0.45, 0.25, 0.6], [-0.5, 0.4, -0.25, 0.58]], ATLAS.bush, mulberry32(79), 16, 0.45);
+});
+const foliageAtlas = makeFoliageAtlas();
+const foliageMat = new THREE.MeshStandardMaterial({ map: foliageAtlas, vertexColors: true, alphaTest: 0.42, side: THREE.DoubleSide, roughness: 0.8, metalness: 0, envMapIntensity: 0.85 });
+foliageMat.onBeforeCompile = sh => {
+  swayPatch(sh);
+  // Both faces of a card share the canopy normal, and a little light leaks through the leaves.
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <normal_fragment_begin>', 'float faceDirection = 1.0;\nvec3 normal = normalize(vNormal);\nvec3 geometryNormal = normal;')
+    .replace('vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;', 'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance + diffuseColor.rgb * vec3(0.05, 0.07, 0.03);');
+};
+const foliageDepth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: foliageAtlas, alphaTest: 0.42, side: THREE.DoubleSide });
+// Near chunks get leafy card trees; far chunks keep the cheap solid ones. Phones always use the solid ones.
+const LOD_CARDS = !coarse;
 const rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, map: detailTex, envMapIntensity: 0.7 });
 rockMat.onBeforeCompile = detailOnly;
 ROCK.setAttribute('uv', new THREE.Float32BufferAttribute(Array.from(ROCK.attributes.position.array).filter((_, i) => i % 3 !== 1).map(v => v * 0.6), 2));
 const rampMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.6 });
 
-function makeInst(geo, items, tintFn, mat = instMat, shadow = true) {
+function makeInst(geo, items, tintFn, mat = instMat, shadow = true, nearGeo = null) {
   if (!items.length) return null;
   const m = new THREE.InstancedMesh(geo, mat, items.length);
+  if (nearGeo && LOD_CARDS) m.userData.lod = { near: { geo: nearGeo, mat: foliageMat, depth: foliageDepth }, far: { geo, mat, depth: undefined } };
   const M = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color();
   items.forEach((o, i) => {
     e.set(o.tilt ? o.rot * 3 : 0, o.rot * TAU, o.tilt ? o.tint * 2 : 0);
@@ -145,7 +278,7 @@ grassMat.onBeforeCompile = sh => {
       'gl_Position = projectionMatrix * mvPosition;'
     ].join('\n'));
 };
-const GT = 40, GCELLS = GT / CELL, GRASS_R = 2, GRASS_DENS = coarse ? 4 : 8;
+const GT = 40, GCELLS = GT / CELL, GRASS_R = 2, GRASS_DENS = coarse ? 4 : 12;
 const grassTiles = new Map();
 const FLOWERS = [lin('#f4d23c'), lin('#f5f2ea'), lin('#b48ad8'), lin('#e8743a')];
 function buildGrassTile(tx, tz) {
@@ -231,9 +364,9 @@ function buildChunk(cx, cz) {
   group.add(terrain);
   const d = getChunkData(cx, cz);
   const inst = [
-    makeInst(PINE, d.trees, (col, t) => col.setRGB(0.82 + t * 0.3, 0.86 + t * 0.22, 0.8 + t * 0.2)),
-    makeInst(OAK, d.oaks, (col, t) => col.setRGB(0.85 + t * 0.35, 0.88 + t * 0.2, 0.8 + t * 0.1)),
-    makeInst(BUSH, d.bushes, (col, t) => col.setRGB(0.85 + t * 0.3, 0.9 + t * 0.2, 0.85)),
+    makeInst(PINE, d.trees, (col, t) => col.setRGB(0.82 + t * 0.3, 0.86 + t * 0.22, 0.8 + t * 0.2), instMat, true, PINE_CARDS),
+    makeInst(OAK, d.oaks, (col, t) => col.setRGB(0.85 + t * 0.35, 0.88 + t * 0.2, 0.8 + t * 0.1), instMat, true, OAK_CARDS),
+    makeInst(BUSH, d.bushes, (col, t) => col.setRGB(0.85 + t * 0.3, 0.9 + t * 0.2, 0.85), instMat, true, BUSH_CARDS),
     makeInst(CACTUS, d.cacti, (col, t) => col.setRGB(0.9 + t * 0.2, 0.9 + t * 0.15, 0.85)),
     makeInst(ROCK, d.rocks, (col, t) => col.setRGB(0.85 + t * 0.3, 0.83 + t * 0.28, 0.8 + t * 0.26), rockMat)
   ].filter(Boolean);
@@ -288,7 +421,14 @@ function updateChunks(all) {
     if (dist > VIEW_R && !inHole(ch.cx, ch.cz)) { disposeChunk(k); continue; }
     // Shadows only reach ~40 m, so far chunks skip the shadow pass (matters in Deep Forest).
     const near = dist <= 1;
-    if (ch.near !== near) { ch.near = near; ch.inst.forEach(m => { m.castShadow = near; }); }
+    if (ch.near !== near) {
+      ch.near = near;
+      ch.inst.forEach(m => {
+        m.castShadow = near;
+        const l = m.userData.lod;
+        if (l) { const s = near ? l.near : l.far; m.geometry = s.geo; m.material = s.mat; m.customDepthMaterial = s.depth; }
+      });
+    }
   }
   const need = [];
   for (let j = -VIEW_R; j <= VIEW_R; j++) for (let i = -VIEW_R; i <= VIEW_R; i++) if (!chunks.has((pcx + i) + ',' + (pcz + j))) need.push([pcx + i, pcz + j, i * i + j * j]);
