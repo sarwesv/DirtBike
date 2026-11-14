@@ -207,7 +207,7 @@ foliageMat.onBeforeCompile = sh => {
 };
 const foliageDepth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: foliageAtlas, alphaTest: 0.42, side: THREE.DoubleSide });
 // Near chunks get leafy card trees; far chunks keep the cheap solid ones. Phones always use the solid ones.
-const LOD_CARDS = !coarse;
+let LOD_CARDS = !coarse;
 const rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, map: detailTex, envMapIntensity: 0.7 });
 rockMat.onBeforeCompile = detailOnly;
 ROCK.setAttribute('uv', new THREE.Float32BufferAttribute(Array.from(ROCK.attributes.position.array).filter((_, i) => i % 3 !== 1).map(v => v * 0.6), 2));
@@ -216,7 +216,7 @@ const rampMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 
 function makeInst(geo, items, tintFn, mat = instMat, shadow = true, nearGeo = null) {
   if (!items.length) return null;
   const m = new THREE.InstancedMesh(geo, mat, items.length);
-  if (nearGeo && LOD_CARDS) m.userData.lod = { near: { geo: nearGeo, mat: foliageMat, depth: foliageDepth }, far: { geo, mat, depth: undefined } };
+  if (nearGeo && !coarse) m.userData.lod = { near: { geo: nearGeo, mat: foliageMat, depth: foliageDepth }, far: { geo, mat, depth: undefined } };
   const M = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color();
   items.forEach((o, i) => {
     e.set(o.tilt ? o.rot * 3 : 0, o.rot * TAU, o.tilt ? o.tint * 2 : 0);
@@ -426,7 +426,7 @@ function updateChunks(all) {
       ch.inst.forEach(m => {
         m.castShadow = near;
         const l = m.userData.lod;
-        if (l) { const s = near ? l.near : l.far; m.geometry = s.geo; m.material = s.mat; m.customDepthMaterial = s.depth; }
+        if (l) { const s = near && LOD_CARDS ? l.near : l.far; m.geometry = s.geo; m.material = s.mat; m.customDepthMaterial = s.depth; }
       });
     }
   }

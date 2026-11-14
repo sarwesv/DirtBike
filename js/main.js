@@ -14,12 +14,37 @@ function resize() {
   if (post) post.resize();
 }
 // Drop render resolution step by step when the frame rate sags (never raises it, to avoid flicker).
-let dpr = renderer.getPixelRatio(), fpsT = 0, fpsN = 0;
+// Graphics tiers. When the frame rate sags, Auto drops expensive features first (shadow detail, then
+// leafy trees) and only then lowers resolution, never below native on desktop, so the image stays sharp.
+const QUALITY = [
+  { name: 'Ultra', shadow: 4096, cards: true },
+  { name: 'High', shadow: 2048, cards: true },
+  { name: 'Fast', shadow: 1024, cards: false }
+];
+const maxDpr = renderer.getPixelRatio(), minDpr = coarse ? 0.75 : Math.min(1, maxDpr);
+let qLevel = coarse ? 2 : 0, qAuto = true, dpr = maxDpr, fpsT = 0, fpsN = 0;
+try { const s = JSON.parse(localStorage.getItem('ridgeline-moto-gfx') || 'null'); if (s) { qAuto = s.auto; qLevel = clamp(s.level, 0, 2); } } catch (e) {}
+function applyQuality() {
+  const q = QUALITY[qLevel], size = coarse ? Math.min(q.shadow, 1024) : q.shadow;
+  if (sun.shadow.mapSize.x !== size) { sun.shadow.mapSize.set(size, size); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
+  if (LOD_CARDS !== (q.cards && !coarse)) { LOD_CARDS = q.cards && !coarse; for (const ch of chunks.values()) ch.near = null; }
+  const label = 'Graphics: ' + (qAuto ? 'Auto · ' : '') + q.name;
+  document.querySelectorAll('.js-gfx').forEach(b => { b.textContent = label; });
+}
+function cycleQuality() {
+  // Auto -> Ultra -> High -> Fast -> Auto
+  if (qAuto) { qAuto = false; qLevel = 0; } else if (qLevel < 2) qLevel++; else { qAuto = true; qLevel = coarse ? 2 : 0; }
+  dpr = maxDpr; renderer.setPixelRatio(dpr); resize(); applyQuality();
+  try { localStorage.setItem('ridgeline-moto-gfx', JSON.stringify({ auto: qAuto, level: qLevel })); } catch (e) {}
+}
+document.querySelectorAll('.js-gfx').forEach(b => b.addEventListener('click', cycleQuality));
 function adaptQuality(dt) {
   fpsT += dt; fpsN++;
   if (fpsT < 2.5) return;
   const fps = fpsN / fpsT; fpsT = 0; fpsN = 0;
-  if (fps < 40 && dpr > 0.75) { dpr = Math.max(0.75, dpr - 0.25); renderer.setPixelRatio(dpr); resize(); }
+  if (!qAuto || fps >= 40) return;
+  if (qLevel < 2) { qLevel++; applyQuality(); }
+  else if (dpr > minDpr) { dpr = Math.max(minDpr, dpr - 0.25); renderer.setPixelRatio(dpr); resize(); }
 }
 addEventListener('resize', resize);
 let last = performance.now(), saveT = 0;
@@ -60,6 +85,7 @@ function frame(now) {
 
 function start(data) {
   renderGarage();
+  applyQuality();
   setWorld((data && data.world) || savedWorld, true);
   renderWorlds();
   setBike((data && data.bike) || savedBike);

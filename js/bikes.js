@@ -47,19 +47,116 @@ function plateTexture(spec, transparent) {
   x.fillText(spec.num, 64, 52);
   const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; return t;
 }
-// Shroud graphics: race stripes in the bike's colours, laid out in metres on the panel.
-function shroudTexture(spec, z0, z1, y0, y1) {
-  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 160;
-  const x = cv.getContext('2d');
-  x.fillStyle = spec.plastic; x.fillRect(0, 0, 256, 160);
-  x.save(); x.transform(1, 0, -0.55, 1, 0, 0);
-  x.fillStyle = spec.plastic2 === spec.plastic ? '#15140f' : spec.plastic2; x.fillRect(70, 0, 46, 160); x.fillRect(150, 0, 18, 160);
-  x.fillStyle = '#f4f1e8'; x.fillRect(122, 0, 14, 160); x.fillRect(176, 0, 8, 160);
-  x.restore();
-  x.fillStyle = 'rgba(0,0,0,0.18)'; x.fillRect(0, 130, 256, 30);
-  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding;
+// Canvas texture helper. `data` textures (masks, grip patterns) stay linear; artwork is sRGB.
+function canvasTex(w, h, draw, srgb = true) {
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  draw(cv.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(cv);
+  if (srgb) t.encoding = THREE.sRGBEncoding;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+const darker = (hex, k) => { const c = new THREE.Color(hex).multiplyScalar(k); return '#' + c.getHexString(); };
+// Shroud graphics laid out in metres on the panel. The right-hand panel is drawn mirrored so its
+// lettering reads correctly from that side.
+function shroudTexture(spec, z0, z1, y0, y1, mirror) {
+  const t = canvasTex(1024, 768, (x, W, H) => {
+    if (mirror) { x.translate(W, 0); x.scale(-1, 1); }
+    const two = spec.plastic2 === spec.plastic ? '#15140f' : spec.plastic2;
+    x.fillStyle = spec.plastic; x.fillRect(0, 0, W, H);
+    // Sweeping band from the lower rear up toward the front.
+    const band = (off, wid, col) => {
+      x.fillStyle = col; x.beginPath();
+      x.moveTo(-40, H * 0.95 - off); x.bezierCurveTo(W * 0.3, H * 0.9 - off, W * 0.55, H * 0.25 - off, W + 40, H * 0.12 - off);
+      x.lineTo(W + 40, H * 0.12 - off + wid); x.bezierCurveTo(W * 0.55, H * 0.25 - off + wid, W * 0.3, H * 0.9 - off + wid, -40, H * 0.95 - off + wid);
+      x.closePath(); x.fill();
+    };
+    band(0, 170, two); band(-178, 18, '#f4f1e8'); band(14, 10, '#f4f1e8');
+    // Lettering.
+    x.save(); x.translate(W * 0.48, H * 0.62); x.rotate(-0.42); x.transform(1, 0, -0.25, 1, 0, 0);
+    x.font = '900 110px "Barlow Semi Condensed", "Arial Narrow", Impact, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.lineWidth = 10; x.strokeStyle = '#15140f'; x.strokeText('RIDGELINE', 0, 0);
+    x.fillStyle = '#f4f1e8'; x.fillText('RIDGELINE', 0, 0);
+    x.restore();
+    // Small sponsor blocks near the top.
+    x.fillStyle = '#15140f'; x.fillRect(W * 0.08, H * 0.08, 220, 64);
+    x.font = '800 44px "Barlow Semi Condensed", Arial, sans-serif'; x.fillStyle = spec.plastic; x.textAlign = 'left'; x.textBaseline = 'middle';
+    x.fillText('MOTO ' + spec.num, W * 0.08 + 16, H * 0.08 + 33);
+    x.fillStyle = '#f4f1e8'; x.fillRect(W * 0.08 + 232, H * 0.08 + 8, 120, 48);
+    x.fillStyle = '#15140f'; x.font = '800 30px "Barlow Semi Condensed", Arial, sans-serif'; x.fillText('MX', W * 0.08 + 270, H * 0.08 + 33);
+    // Soft shading toward the bottom edge.
+    const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(255,255,255,0.08)'); g.addColorStop(1, 'rgba(0,0,0,0.22)');
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+  });
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   t.repeat.set(1 / (z1 - z0), 1 / (y1 - y0)); t.offset.set(-z0 / (z1 - z0), -y0 / (y1 - y0));
   return t;
+}
+// Shared bike textures, built once.
+let BIKE_TEX = null;
+function bikeTextures() {
+  if (BIKE_TEX) return BIKE_TEX;
+  const rnd = mulberry32(404);
+  BIKE_TEX = {
+    // Tyre: tread zone plus raised sidewall lettering. u runs around the wheel, v around the tube.
+    tyre: canvasTex(1024, 256, (x, W, H) => {
+      x.fillStyle = '#1b1b1e'; x.fillRect(0, 0, W, H);
+      for (let i = 0; i < 4000; i++) { x.fillStyle = `rgba(255,255,255,${rnd() * 0.035})`; x.fillRect(rnd() * W, rnd() * H, 2, 2); }
+      x.font = '700 19px "Barlow Semi Condensed", Arial, sans-serif'; x.fillStyle = '#76767c'; x.textBaseline = 'middle'; x.textAlign = 'center';
+      for (const row of [H * 0.25, H * 0.75]) for (let k = 0; k < 3; k++) x.fillText('RIDGELINE  TRAIL MX  80/100-21', (k + 0.5) * W / 3, row);
+    }),
+    brushed: canvasTex(256, 256, (x, W, H) => {
+      x.fillStyle = '#b9bec4'; x.fillRect(0, 0, W, H);
+      for (let i = 0; i < 900; i++) { const v = 150 + rnd() * 105; x.fillStyle = `rgba(${v},${v},${v + 4},0.35)`; x.fillRect(0, rnd() * H, W, 1); }
+    }),
+    carbon: canvasTex(128, 128, (x, W, H) => {
+      for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++) {
+        const v = (i + j) % 2 ? 40 : 22; const g = x.createLinearGradient(i * 8, j * 8, i * 8 + 8, j * 8 + 8);
+        g.addColorStop(0, `rgb(${v},${v},${v + 3})`); g.addColorStop(1, `rgb(${v + 22},${v + 22},${v + 26})`);
+        x.fillStyle = g; x.fillRect(i * 8, j * 8, 8, 8);
+      }
+    }),
+    heat: canvasTex(512, 8, (x, W, H) => {
+      const g = x.createLinearGradient(0, 0, W, 0);
+      [[0, '#c9a35a'], [0.18, '#a8683a'], [0.36, '#5b4a8a'], [0.52, '#3f6aa8'], [0.7, '#b8bec6'], [1, '#d6dade']].forEach(([s, c]) => g.addColorStop(s, c));
+      x.fillStyle = g; x.fillRect(0, 0, W, H);
+    }),
+    grip: canvasTex(128, 128, (x, W, H) => {
+      x.fillStyle = '#2a2a2f'; x.fillRect(0, 0, W, H);
+      for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++) { x.fillStyle = (i + j) % 2 ? '#1b1b1f' : '#34343a'; x.fillRect(i * 8 + 1, j * 8 + 1, 6, 6); }
+    }),
+    grille: canvasTex(128, 128, (x, W, H) => {
+      x.fillStyle = '#15161a'; x.fillRect(0, 0, W, H);
+      for (let j = 0; j < H; j += 6) { x.fillStyle = '#3c3f46'; x.fillRect(0, j, W, 2); }
+      for (let i = 0; i < W; i += 16) { x.fillStyle = '#26282d'; x.fillRect(i, 0, 2, H); }
+    })
+  };
+  BIKE_TEX.carbon.repeat.set(3, 3); BIKE_TEX.grip.repeat.set(10, 10); BIKE_TEX.brushed.repeat.set(4, 4);
+  return BIKE_TEX;
+}
+function gearTexture(base, accent, kind) {
+  return canvasTex(512, 512, (x, W, H) => {
+    x.fillStyle = base; x.fillRect(0, 0, W, H);
+    if (kind === 'jersey') {
+      // Shoulder yoke, chest sweep and cuffs (v runs hip to shoulder on the torso, shoulder to wrist on sleeves).
+      x.fillStyle = darker(base, 0.55); x.fillRect(0, 0, W, H * 0.12);
+      x.fillStyle = accent; x.beginPath(); x.moveTo(0, H * 0.55); x.lineTo(W, H * 0.3); x.lineTo(W, H * 0.42); x.lineTo(0, H * 0.67); x.fill();
+      x.fillStyle = '#f4f1e8'; x.beginPath(); x.moveTo(0, H * 0.69); x.lineTo(W, H * 0.44); x.lineTo(W, H * 0.47); x.lineTo(0, H * 0.72); x.fill();
+      x.fillStyle = darker(base, 0.6); x.fillRect(0, H * 0.9, W, H * 0.1);
+    } else if (kind === 'pants') {
+      x.fillStyle = darker(base, 0.65); x.fillRect(0, 0, W, H * 0.3);
+      x.fillStyle = accent; x.fillRect(W * 0.18, 0, W * 0.07, H); x.fillRect(W * 0.68, 0, W * 0.07, H);
+      x.fillStyle = 'rgba(255,255,255,0.12)'; x.fillRect(0, H * 0.62, W, H * 0.04);
+    } else if (kind === 'helmet') {
+      // Racing stripes over the crown run along u = 0.25 (front) and 0.75 (back).
+      for (const u of [0.25, 0.75]) {
+        x.fillStyle = accent; x.fillRect(W * (u - 0.045), 0, W * 0.09, H * 0.55);
+        x.fillStyle = '#f4f1e8'; x.fillRect(W * (u - 0.06), 0, W * 0.012, H * 0.55); x.fillRect(W * (u + 0.048), 0, W * 0.012, H * 0.55);
+      }
+      x.fillStyle = darker(base, 0.5); x.fillRect(0, H * 0.62, W, H * 0.04);
+    }
+  });
 }
 function buildBike(spec) {
   const look = LOOKS[spec.id] || LOOKS.trail;
@@ -71,11 +168,24 @@ function buildBike(spec) {
   const S = (c, rough = 0.55, metal = 0) => new THREE.MeshStandardMaterial({ color: lin(c), roughness: rough, metalness: metal });
   const G = (c, rough = 0.3) => new THREE.MeshPhysicalMaterial({ color: lin(c), roughness: rough, metalness: 0, clearcoat: 0.9, clearcoatRoughness: 0.12 });
   const plastic = G(spec.plastic), plastic2 = G(spec.plastic2), plateMat = G(spec.plateBg, 0.4);
+  plastic2.side = THREE.DoubleSide;
   const rubber = S('#18181b', 0.92), black = S('#1d1d20', 0.6), chrome = S('#d6dade', 0.18, 1), alu = S('#a7adb3', 0.32, 0.9);
   const darkMetal = S('#3a3d42', 0.45, 0.7), mag = S('#7d8075', 0.5, 0.6), frameMat = S(look.frame, 0.35, 0.6), accent = S(spec.accent, 0.3, 0.9);
-  const rimMat = S(look.rim, 0.3, 0.9), seatMat = S('#232327', 0.85), spring = S('#e8b92e', 0.35, 0.6);
-  const jersey = S(spec.jersey, 0.85), pants = S(look.pants, 0.85), bootMat = G('#efece4', 0.45), glove = S('#202024', 0.8);
-  const helmetMat = G(look.helmet, 0.22), lens = S(look.lens, 0.08, 1), strap = S('#151517', 0.7);
+  const T = bikeTextures();
+  const rimMat = S(look.rim, 0.3, 0.9), spring = S('#e8b92e', 0.35, 0.6);
+  const seatMat = new THREE.MeshStandardMaterial({ map: T.grip, roughness: 0.92 });
+  const tyreMat = new THREE.MeshStandardMaterial({ map: T.tyre, roughness: 0.9 });
+  const brushed = new THREE.MeshStandardMaterial({ map: T.brushed, roughness: 0.35, metalness: 0.95 });
+  const carbon = new THREE.MeshPhysicalMaterial({ map: T.carbon, roughness: 0.3, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.05 });
+  const heatPipe = new THREE.MeshStandardMaterial({ map: T.heat, roughness: 0.25, metalness: 1 });
+  const grille = new THREE.MeshStandardMaterial({ map: T.grille, roughness: 0.6, metalness: 0.4 });
+  const caliper = S(spec.id === 'scrambler' ? '#9aa1a8' : '#c8323a', 0.35, 0.6), hose = S('#141416', 0.6), plugCap = S('#c8323a', 0.5);
+  const tailLight = new THREE.MeshStandardMaterial({ color: lin('#5a0d0d'), emissive: lin('#ff2a1a'), emissiveIntensity: 1.4, roughness: 0.2 });
+  const jersey = new THREE.MeshStandardMaterial({ map: gearTexture(spec.jersey, spec.plastic2 === spec.plastic ? spec.accent : spec.plastic2, 'jersey'), roughness: 0.85 });
+  const pants = new THREE.MeshStandardMaterial({ map: gearTexture(look.pants, spec.plastic, 'pants'), roughness: 0.85 });
+  const bootMat = G('#efece4', 0.45), glove = S('#202024', 0.8);
+  const helmetMat = new THREE.MeshPhysicalMaterial({ map: gearTexture(look.helmet, spec.plastic2 === look.helmet ? spec.plastic : spec.plastic2, 'helmet'), roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.06 });
+  const lens = S(look.lens, 0.08, 1), strap = S('#151517', 0.7);
 
   const V = a => new THREE.Vector3(...a), Y = new THREE.Vector3(0, 1, 0);
   const put = (parent, geo, mat, p = [0, 0, 0], r = [0, 0, 0]) => { const m = new THREE.Mesh(geo, mat); m.position.set(...p); m.rotation.set(...r); parent.add(m); return m; };
@@ -108,15 +218,19 @@ function buildBike(spec) {
   /* Wheels: knobby tyre, coloured rim, 32 laced spokes, hub and wavy brake disc. */
   const wheel = (parent, z, front) => {
     const g = new THREE.Group();
-    put(g, new THREE.TorusGeometry(R_WHEEL - 0.075, 0.082, 12, 36), rubber, [0, 0, 0], [0, Math.PI / 2, 0]);
+    put(g, new THREE.TorusGeometry(R_WHEEL - 0.075, 0.082, 18, 72), tyreMat, [0, 0, 0], [0, Math.PI / 2, 0]);
     const knobs = [];
-    for (let k = 0; k < 40; k++) {
-      const a = k / 40 * TAU, off = (k % 2 ? 0.045 : -0.045), rr = R_WHEEL - 0.006;
-      knobs.push([new THREE.BoxGeometry(0.05, 0.03, 0.05), '#18181b', mtx(off, Math.cos(a) * rr, Math.sin(a) * rr, -a, 0, 0)]);
-      if (k % 2 === 0) knobs.push([new THREE.BoxGeometry(0.04, 0.026, 0.045), '#18181b', mtx(0, Math.cos(a + 0.08) * rr, Math.sin(a + 0.08) * rr, -a - 0.08, 0, 0)]);
+    for (let k = 0; k < 56; k++) {
+      const a = k / 56 * TAU, rr = R_WHEEL - 0.004;
+      // Staggered shoulder knobs angled onto the sidewall, with a centre row between them.
+      for (const s of [-1, 1]) if ((k + (s > 0 ? 1 : 0)) % 2 === 0)
+        knobs.push([new THREE.BoxGeometry(0.042, 0.028, 0.04), '#18181b', mtx(s * 0.055, Math.cos(a) * (rr - 0.012), Math.sin(a) * (rr - 0.012), -a, 0, -s * 0.5)]);
+      if (k % 2 === 0) knobs.push([new THREE.BoxGeometry(0.05, 0.026, 0.036), '#18181b', mtx(0, Math.cos(a + 0.05) * rr, Math.sin(a + 0.05) * rr, -a - 0.05, 0, 0)]);
     }
     put(g, mergeParts(knobs), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 }));
-    put(g, new THREE.TorusGeometry(R_WHEEL - 0.15, 0.022, 6, 36), rimMat, [0, 0, 0], [0, Math.PI / 2, 0]);
+    put(g, new THREE.TorusGeometry(R_WHEEL - 0.15, 0.022, 8, 64), rimMat, [0, 0, 0], [0, Math.PI / 2, 0]);
+    put(g, new THREE.BoxGeometry(0.03, 0.03, 0.05), alu, [0, -(R_WHEEL - 0.165), 0]);
+    put(g, new THREE.CylinderGeometry(0.006, 0.006, 0.05, 6), chrome, [0.01, R_WHEEL - 0.18, 0.02], [0.3, 0, 0]);
     const spokes = [];
     for (let k = 0; k < 32; k++) {
       const a = k / 32 * TAU, side = k % 2 ? 1 : -1, len = R_WHEEL - 0.16;
@@ -129,7 +243,14 @@ function buildBike(spec) {
     const rp = rotor.attributes.position;
     for (let i = 0; i < rp.count; i++) { const x = rp.getX(i), z = rp.getZ(i), a = Math.atan2(z, x), r = Math.hypot(x, z); if (r > 0.05) { const k = 1 + Math.sin(a * 12) * 0.05; rp.setX(i, x * k); rp.setZ(i, z * k); } }
     put(g, rotor, chrome, [front ? -0.085 : 0.085, 0, 0], [0, 0, Math.PI / 2]);
-    if (!front) disc(g, 0.11, 0.008, accent, [-0.09, 0, 0], 28);
+    if (!front) {
+      // Toothed rear sprocket.
+      const sp = new THREE.Shape(), teeth = 42;
+      for (let k = 0; k <= teeth * 2; k++) { const a = k / (teeth * 2) * TAU, r = k % 2 ? 0.112 : 0.122; k ? sp.lineTo(Math.cos(a) * r, Math.sin(a) * r) : sp.moveTo(r, 0); }
+      for (let h = 0; h < 6; h++) { const a = h / 6 * TAU, hole = new THREE.Path(); hole.absarc(Math.cos(a) * 0.075, Math.sin(a) * 0.075, 0.022, 0, TAU, true); sp.holes.push(hole); }
+      const sg = new THREE.ExtrudeGeometry(sp, { depth: 0.006, bevelEnabled: false, curveSegments: 6 });
+      sg.rotateY(Math.PI / 2); put(g, sg, accent, [-0.095, 0, 0]);
+    }
     g.position.set(0, R_WHEEL, z); parent.add(g); return g;
   };
   const rear = wheel(body, -0.72, false);
@@ -167,7 +288,7 @@ function buildBike(spec) {
   tube(body, [[-0.112, 0.385, -0.02], [-0.112, 0.31, -0.38], [-0.112, 0.25, -0.72]], 0.008, darkMetal, 8);
 
   /* Swingarm and rear shock with a coil spring. */
-  for (const s of [-1, 1]) slab(body, [[0.0, 0.5], [-0.3, 0.47], [-0.72, 0.41], [-0.79, 0.36], [-0.72, 0.31], [-0.3, 0.38], [-0.02, 0.41]], 0.035, alu, s * 0.1);
+  for (const s of [-1, 1]) slab(body, [[0.0, 0.5], [-0.3, 0.47], [-0.72, 0.41], [-0.79, 0.36], [-0.72, 0.31], [-0.3, 0.38], [-0.02, 0.41]], 0.035, brushed, s * 0.1);
   put(body, new THREE.BoxGeometry(0.22, 0.05, 0.08), alu, [0, 0.44, -0.3]);
   capsule(body, [0, 0.44, -0.27], [0, 0.88, -0.1], 0.024, 0.03, chrome);
   {
@@ -178,11 +299,13 @@ function buildBike(spec) {
   }
   capsule(body, [0.06, 0.8, -0.18], [0.06, 0.86, -0.02], 0.03, 0.03, spring);
 
-  /* Exhaust: header wraps the barrel and runs back into a silencer under the side panel. */
+  /* Exhaust: heat-tinted header wraps the barrel and runs into a brushed silencer with a carbon end cap. */
   if (!spec.electric) {
-  tube(body, [[0.04, 0.74, 0.27], [0.11, 0.64, 0.37], [0.16, 0.45, 0.32], [0.18, 0.4, 0.08], [0.18, 0.56, -0.2], [0.165, 0.74, -0.42]], 0.034, chrome, 48);
-  capsule(body, [0.165, 0.74, -0.42], [0.165, 0.89, -0.92], 0.07, 0.06, alu);
-  capsule(body, [0.165, 0.89, -0.92], [0.165, 0.9, -0.97], 0.045, 0.03, black);
+  tube(body, [[0.04, 0.74, 0.27], [0.11, 0.64, 0.37], [0.16, 0.45, 0.32], [0.18, 0.4, 0.08], [0.18, 0.56, -0.2], [0.165, 0.74, -0.42]], 0.034, heatPipe, 64);
+  capsule(body, [0.165, 0.74, -0.42], [0.165, 0.89, -0.92], 0.07, 0.062, brushed);
+  capsule(body, [0.165, 0.89, -0.92], [0.165, 0.9, -0.97], 0.064, 0.04, carbon);
+  for (const t of [0.15, 0.85]) put(body, new THREE.TorusGeometry(0.071, 0.006, 6, 24), darkMetal, [0.165, lerp(0.74, 0.89, t), lerp(-0.42, -0.92, t)], [Math.PI / 2 - 0.29, 0, 0]);
+  slab(body, [[0.1, 0.5], [0.3, 0.42], [0.36, 0.5], [0.16, 0.6]], 0.012, carbon, 0.2, 0.003);
   }
   if (spec.vintage) {
     // Twin chrome pipes swept high along the side, plus a round headlamp.
@@ -194,11 +317,36 @@ function buildBike(spec) {
     capsule(body, [-0.165, 0.74, -0.42], [-0.165, 0.89, -0.92], 0.07, 0.06, alu);
   }
 
-  /* Radiators behind the shrouds. */
+  /* Radiators behind the shrouds, with louvred cores and coolant hoses to the head. */
   for (const s of [-1, 1]) {
     put(body, new THREE.BoxGeometry(0.05, 0.28, 0.22), black, [s * 0.125, 0.78, 0.31], [0.12, 0, 0]);
-    put(body, new THREE.BoxGeometry(0.052, 0.24, 0.18), darkMetal, [s * 0.13, 0.78, 0.31], [0.12, 0, 0]);
+    put(body, new THREE.BoxGeometry(0.054, 0.24, 0.18), grille, [s * 0.13, 0.78, 0.31], [0.12, 0, 0]);
+    if (!spec.electric) tube(body, [[s * 0.11, 0.9, 0.24], [s * 0.07, 0.92, 0.2], [s * 0.03, 0.85, 0.22]], 0.014, hose, 12);
   }
+
+  /* Chain made of individual links, routed over both sprockets. */
+  {
+    const links = [], run = (a, b, n) => { for (let i = 0; i < n; i++) { const t = (i + 0.5) / n, y = lerp(a[0], b[0], t), z = lerp(a[1], b[1], t), ang = Math.atan2(b[0] - a[0], b[1] - a[1]); links.push([new THREE.BoxGeometry(0.014, 0.012, 0.016), '#4a4c52', mtx(-0.112, y, z, -ang + Math.PI / 2, 0, 0)]); } };
+    run([0.475, -0.02], [0.476, -0.72], 44); run([0.385, -0.02], [0.247, -0.72], 44);
+    for (let i = 0; i < 12; i++) { const a = Math.PI / 2 + i / 11 * Math.PI; links.push([new THREE.BoxGeometry(0.014, 0.012, 0.016), '#4a4c52', mtx(-0.112, 0.36 + Math.sin(a) * 0.115, -0.72 + Math.cos(a) * 0.115, -a, 0, 0)]); }
+    put(body, mergeParts(links), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.9 }));
+    slab(body, [[-0.08, 0.5], [-0.62, 0.45], [-0.66, 0.42], [-0.08, 0.46]], 0.012, carbon, -0.13, 0.003);
+  }
+
+  /* Controls and hardware: pegs, brake pedal, shifter, kickstand, calipers, plug cap, tank cap, tail light. */
+  put(body, new THREE.BoxGeometry(0.03, 0.015, 0.16), brushed, [0.17, 0.47, 0.13], [0.15, 0, 0]);
+  tube(body, [[0.15, 0.45, -0.02], [0.17, 0.46, 0.1], [0.18, 0.48, 0.17]], 0.009, brushed, 8);
+  tube(body, [[-0.15, 0.5, 0.02], [-0.17, 0.52, 0.12], [-0.18, 0.55, 0.18]], 0.008, brushed, 8);
+  tube(body, [[-0.1, 0.36, -0.05], [-0.16, 0.3, -0.28], [-0.17, 0.28, -0.4]], 0.01, darkMetal, 8);
+  put(body, new THREE.BoxGeometry(0.03, 0.05, 0.08), caliper, [0.09, R_WHEEL - 0.08, -0.82], [0.4, 0, 0]);
+  if (!spec.electric) {
+    capsule(body, [0.0, 0.83, 0.25], [0.0, 0.9, 0.31], 0.022, 0.018, plugCap);
+    tube(body, [[0.0, 0.9, 0.31], [0.05, 0.96, 0.24], [0.08, 0.9, 0.12]], 0.005, hose, 10);
+    capsule(body, [0.0, 0.6, -0.02], [0.0, 0.66, -0.14], 0.045, 0.05, darkMetal);
+  }
+  disc(body, 0.03, 0.02, chrome, [0, spec.rally ? 1.1 : 1.04, 0.28], 16).rotation.set(0, 0, 0);
+  put(body, new THREE.BoxGeometry(0.08, 0.035, 0.03), tailLight, [0, 1.0, -1.08], [-0.2, 0, 0]);
+  for (const s of [-1, 1]) slab(body, [[0.1, 0.36], [0.24, 0.34], [0.26, 0.5], [0.12, 0.52]], 0.01, carbon, s * 0.105, 0.002);
 
   /* Bodywork: tank, shrouds with race graphics, seat, rear fender, number boards. */
   const tankPts = spec.rally
@@ -206,8 +354,10 @@ function buildBike(spec) {
     : [[0.0, 0.86], [0.42, 0.9], [0.5, 0.98], [0.4, 1.04], [0.1, 1.02], [-0.04, 0.96]];
   slab(body, tankPts, spec.rally ? 0.44 : 0.3, spec.rally ? plastic2 : plastic, 0, 0.03);
   const shroudPts = [[0.08, 0.72], [0.44, 0.64], [0.62, 0.84], [0.58, 1.04], [0.3, 1.06], [0.06, 0.98]];
-  const shroudMat = new THREE.MeshPhysicalMaterial({ map: shroudTexture(spec, 0.04, 0.64, 0.62, 1.08), roughness: 0.3, clearcoat: 0.9, clearcoatRoughness: 0.12 });
-  for (const s of [-1, 1]) slab(body, shroudPts, 0.03, shroudMat, s * 0.165, 0.008);
+  for (const s of [-1, 1]) {
+    const shroudMat = new THREE.MeshPhysicalMaterial({ map: shroudTexture(spec, 0.04, 0.64, 0.62, 1.08, s > 0), roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.08 });
+    slab(body, shroudPts, 0.03, shroudMat, s * 0.165, 0.008);
+  }
   slab(body, [[0.14, 0.98], [0.06, 1.05], [-0.3, 1.04], [-0.66, 1.0], [-0.7, 0.95], [-0.3, 0.93], [0.08, 0.92]], 0.25, seatMat, 0, 0.03);
   slab(body, [[-0.28, 0.93], [-0.7, 0.97], [-1.06, 1.04], [-1.1, 1.0], [-0.7, 0.92], [-0.36, 0.87]], 0.21, plastic, 0, 0.01);
   for (const s of [-1, 1]) {
@@ -222,8 +372,18 @@ function buildBike(spec) {
     capsule(steer, [s * 0.1, 0.74, 0.01], [s * 0.1, 1.14, -0.12], 0.026, 0.026, chrome);
     slab(steer, [[0.17, 0.38], [0.11, 0.42], [0.0, 0.74], [-0.03, 0.72], [0.08, 0.4]], 0.02, plastic2, s * 0.135, 0.006);
   }
-  put(steer, new THREE.BoxGeometry(0.3, 0.05, 0.1), alu, [0, 0.98, -0.07], [-0.32, 0, 0]);
-  put(steer, new THREE.BoxGeometry(0.3, 0.05, 0.1), alu, [0, 1.13, -0.12], [-0.32, 0, 0]);
+  put(steer, new THREE.BoxGeometry(0.3, 0.05, 0.1), brushed, [0, 0.98, -0.07], [-0.32, 0, 0]);
+  put(steer, new THREE.BoxGeometry(0.3, 0.05, 0.1), brushed, [0, 1.13, -0.12], [-0.32, 0, 0]);
+  for (const s of [-1, 1]) disc(steer, 0.028, 0.02, accent, [s * 0.1, 1.165, -0.125], 14).rotation.set(-0.32, 0, 0);
+  put(steer, new THREE.BoxGeometry(0.035, 0.07, 0.06), caliper, [-0.1, R_WHEEL + 0.09, 0.02], [0.5, 0, 0]);
+  tube(steer, [[-0.1, R_WHEEL + 0.13, 0.0], [-0.13, 0.7, 0.03], [-0.14, 1.0, -0.02], [-0.2, 1.22, -0.08], [-0.26, 1.2, -0.12]], 0.007, hose, 24);
+  tube(steer, [[0.26, 1.2, -0.12], [0.2, 1.24, -0.06], [0.08, 1.12, 0.02], [0.02, 0.98, -0.02]], 0.005, hose, 16);
+  for (const s of [-1, 1]) {
+    // Wrap-around hand guards.
+    const hg = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 8, 0, Math.PI, 0, Math.PI * 0.55), plastic2);
+    hg.material = plastic2; hg.position.set(s * 0.37, 1.2, -0.16); hg.rotation.set(-1.1, s > 0 ? -0.4 : Math.PI + 0.4, 0); hg.scale.set(1, 1.4, 0.6);
+    steer.add(hg);
+  }
   slab(steer, [[-0.14, 0.82], [0.1, 0.87], [0.36, 0.85], [0.62, 0.74], [0.64, 0.69], [0.36, 0.79], [0.1, 0.82], [-0.12, 0.79]], 0.17, plastic, 0, 0.01);
   tube(steer, [[-0.37, 1.2, -0.2], [-0.22, 1.18, -0.13], [0, 1.16, -0.11], [0.22, 1.18, -0.13], [0.37, 1.2, -0.2]], 0.014, alu);
   put(steer, new THREE.BoxGeometry(0.2, 0.05, 0.05), plastic2, [0, 1.19, -0.11]);
@@ -265,8 +425,8 @@ function buildBike(spec) {
   }
   const head = new THREE.Group(); head.position.set(0, 1.8, 0.12); head.rotation.x = 0.18; up.add(head);
   put(head, new THREE.SphereGeometry(0.168, 24, 18), helmetMat).scale.set(0.95, 0.95, 1.12);
-  slab(head, [[0.07, -0.15], [0.17, -0.12], [0.2, -0.04], [0.14, -0.05], [0.07, -0.1]], 0.17, plastic, 0, 0.015);
-  slab(head, [[0.04, 0.12], [0.22, 0.11], [0.27, 0.07], [0.12, 0.08]], 0.24, plastic2, 0, 0.008);
+  slab(head, [[0.08, -0.14], [0.17, -0.11], [0.19, -0.05], [0.14, -0.06], [0.08, -0.1]], 0.15, G(look.helmet, 0.2), 0, 0.015);
+  slab(head, [[0.06, 0.11], [0.2, 0.1], [0.25, 0.065], [0.1, 0.075]], 0.22, plastic2, 0, 0.008);
   put(head, new THREE.TorusGeometry(0.168, 0.02, 6, 28, Math.PI * 1.2), strap, [0, 0.03, 0], [Math.PI / 2, 0, Math.PI * 0.4]);
   put(head, new THREE.BoxGeometry(0.2, 0.075, 0.05), black, [0, 0.03, 0.16]);
   put(head, new THREE.BoxGeometry(0.18, 0.06, 0.02), lens, [0, 0.03, 0.188]);
@@ -282,7 +442,8 @@ function setBike(id) {
   bikeSpec = BIKES.find(b => b.id === id) || BIKES[0];
   if (model) {
     scene.remove(model.root);
-    model.root.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map) o.material.map.dispose(); } });
+    const shared = new Set(Object.values(bikeTextures()));
+    model.root.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map && !shared.has(o.material.map)) o.material.map.dispose(); } });
   }
   model = buildBike(bikeSpec);
   syncBike(0);

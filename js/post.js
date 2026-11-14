@@ -26,7 +26,7 @@ const post = POST ? (() => {
     'void main(){',
     '  vec3 c = texture2D(tSrc, vUv).rgb;',
     '  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));',
-    '  gl_FragColor = vec4(c * smoothstep(0.8, 1.05, l), 1.0);',
+    '  gl_FragColor = vec4(c * smoothstep(0.88, 1.2, l), 1.0);',
     '}'
   ].join('\n'));
   const blurMat = mat({ tSrc: { value: null }, uDir: { value: new THREE.Vector2() } }, [
@@ -38,11 +38,14 @@ const post = POST ? (() => {
     '  gl_FragColor = vec4(c, 1.0);',
     '}'
   ].join('\n'));
-  const finalMat = mat({ tScene: { value: null }, tBloom: { value: null }, uTime: { value: 0 }, uAspect: { value: 1 } }, [
-    'uniform sampler2D tScene; uniform sampler2D tBloom; uniform float uTime; uniform float uAspect; varying vec2 vUv;',
+  const finalMat = mat({ tScene: { value: null }, tBloom: { value: null }, uTime: { value: 0 }, uAspect: { value: 1 }, uTexel: { value: new THREE.Vector2() } }, [
+    'uniform sampler2D tScene; uniform sampler2D tBloom; uniform float uTime; uniform float uAspect; uniform vec2 uTexel; varying vec2 vUv;',
     'vec3 toSRGB(vec3 c){ c = clamp(c, 0.0, 1.0); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }',
     'void main(){',
-    '  vec3 c = texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * 0.42;',
+    // Light unsharp mask to keep texture detail crisp after MSAA resolve.
+    '  vec3 c0 = texture2D(tScene, vUv).rgb;',
+    '  vec3 nb = texture2D(tScene, vUv + vec2(uTexel.x, 0.0)).rgb + texture2D(tScene, vUv - vec2(uTexel.x, 0.0)).rgb + texture2D(tScene, vUv + vec2(0.0, uTexel.y)).rgb + texture2D(tScene, vUv - vec2(0.0, uTexel.y)).rgb;',
+    '  vec3 c = max(c0 + (c0 * 4.0 - nb) * 0.16, 0.0) + texture2D(tBloom, vUv).rgb * 0.22;',
     // Grade: gentle saturation lift, warm highlights, cool shadows.
     '  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));',
     '  c = mix(vec3(l), c, 1.03);',
@@ -68,6 +71,7 @@ const post = POST ? (() => {
       brightRT.setSize(Math.ceil(w / 2), Math.ceil(h / 2));
       blurA.setSize(Math.ceil(w / 4), Math.ceil(h / 4)); blurB.setSize(Math.ceil(w / 4), Math.ceil(h / 4));
       finalMat.uniforms.uAspect.value = w / h;
+      finalMat.uniforms.uTexel.value.set(1 / w, 1 / h);
     },
     render() {
       renderer.setRenderTarget(sceneRT);
