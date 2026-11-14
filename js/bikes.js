@@ -195,7 +195,7 @@ function buildBike(spec) {
   const steer = new THREE.Group(); steer.position.set(0, 0, 0.6); body.add(steer);
 
   const S = (c, rough = 0.55, metal = 0) => new THREE.MeshStandardMaterial({ color: lin(c), roughness: rough, metalness: metal });
-  const G = (c, rough = 0.3) => new THREE.MeshPhysicalMaterial({ color: lin(c), roughness: rough, metalness: 0, clearcoat: 0.9, clearcoatRoughness: 0.12 });
+  const G = (c, rough = 0.3) => new THREE.MeshPhysicalMaterial({ color: lin(c), roughness: rough + 0.14, metalness: 0, clearcoat: 0.4, clearcoatRoughness: 0.3 });
   const plastic = G(spec.plastic), plastic2 = G(spec.plastic2), plateMat = G(spec.plateBg, 0.4);
   plastic2.side = THREE.DoubleSide;
   const rubber = S('#18181b', 0.92), black = S('#1d1d20', 0.6), chrome = S('#d6dade', 0.18, 1), alu = S('#a7adb3', 0.32, 0.9);
@@ -444,7 +444,6 @@ function buildBike(spec) {
 
   /* Rider. Boots stay on the pegs and hands on the grips: arms and legs are re-solved every frame
      (see poseRider), so the knees flex with the suspension and the hands follow the bars. */
-  jersey.bumpMap = T.fabric; jersey.bumpScale = 0.012; pants.bumpMap = T.fabric; pants.bumpScale = 0.012;
   const shell = new THREE.MeshPhysicalMaterial({ color: lin('#1c1d21'), roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.2 });
   for (const s of [-1, 1]) {
     slab(body, [[-0.1, 0.46], [0.15, 0.46], [0.17, 0.52], [0.05, 0.57], [0.05, 0.86], [-0.08, 0.88], [-0.12, 0.62]], 0.13, bootMat, s * 0.215, 0.02);
@@ -499,9 +498,48 @@ function buildBike(spec) {
 
   root.scale.setScalar(spec.scale);
   root.rotation.order = 'YXZ';
+  // Ridden-in look: mud on the lower bike, boots and wheels, light dust on the rider.
+  const grimeU = { uRootInv: { value: new THREE.Matrix4() } }, variants = new Map();
+  const wheelParts = new Set(); [rear, front].forEach(g => g.traverse(o => { if (o.isMesh) wheelParts.add(o); }));
+  const riderMats = new Set([jersey, pants, glove, helmetMat, strap]);
+  root.traverse(o => {
+    if (!o.isMesh || o.material === lens || o.material.transparent) return;
+    const isWheel = wheelParts.has(o), isRider = riderMats.has(o.material);
+    const mode = isWheel ? 'wheel' : isRider ? 'rider' : 'body';
+    const key = o.material.uuid + mode;
+    if (!variants.has(key)) variants.set(key, grimeMaterial(o.material, mode, grimeU));
+    o.material = variants.get(key);
+  });
   root.traverse(o => { if (o.isMesh) o.castShadow = true; });
   scene.add(root);
-  return { root, wheelie, steer, rear, front, rider, up, limbs };
+  return { root, wheelie, steer, rear, front, rider, up, limbs, grimeU };
+}
+// Mud colour follows the map (dust in the desert, dark mud in the wetlands, slush on the tundra).
+const grimeMud = new THREE.Color();
+function setGrimeColor() { grimeMud.copy(lin({ desert: '#b4906a', canyon: '#a8714a', tundra: '#9aa1a8', swamp: '#3b3424', autumn: '#5a4430', forest: '#4e3c2a' }[W.id] || '#5f4a34')); }
+setGrimeColor();
+// Clone a material with dirt layered in. Noise comes from each part's own geometry so it sticks to the part;
+// height (for "body") is measured in the bike's frame so mud collects low, around the wheels and engine.
+function grimeMaterial(base, mode, shared) {
+  const m = base.clone();
+  const amount = mode === 'wheel' ? 0.42 : mode === 'rider' ? 0.1 : 0.7;
+  m.onBeforeCompile = sh => {
+    sh.uniforms.tGrime = { value: groundTex }; sh.uniforms.uMud = { value: grimeMud }; sh.uniforms.uRootInv = shared.uRootInv;
+    sh.uniforms.uAmt = { value: amount }; sh.uniforms.uHeight = { value: mode === 'body' ? 1 : 0 };
+    sh.vertexShader = 'uniform mat4 uRootInv;\nvarying vec3 vOP;\nvarying vec3 vRP;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+      '#include <begin_vertex>\nvOP = position;\nvRP = (uRootInv * modelMatrix * vec4(position, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform sampler2D tGrime; uniform vec3 uMud; uniform float uAmt; uniform float uHeight;\nvarying vec3 vOP;\nvarying vec3 vRP;\n' + sh.fragmentShader
+      .replace('#include <color_fragment>', [
+        '#include <color_fragment>',
+        'float gn = texture2D(tGrime, vOP.xz * 2.3 + vOP.y * 1.7).g * 0.6 + texture2D(tGrime, vOP.zy * 3.7 + 0.3).r * 0.4;',
+        'float gh = uHeight > 0.5 ? smoothstep(0.95, 0.25, vRP.y) : 1.0;',
+        'float grime = clamp(gh * uAmt * smoothstep(0.42, 0.68, gn + gh * 0.12), 0.0, 1.0);',
+        'diffuseColor.rgb = mix(diffuseColor.rgb, uMud * (0.7 + gn * 0.55), grime);'
+      ].join('\n'))
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.95, grime);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.0, grime);');
+  };
+  return m;
 }
 // Two-bone IK: place the middle joint (knee or elbow) so both segments keep their length,
 // bending toward `pole`.

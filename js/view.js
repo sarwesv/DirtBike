@@ -4,6 +4,12 @@
 'use strict';
 
 /* ---------- Visual sync ---------- */
+// Soft contact shadow under the bike, fading as it leaves the ground.
+const contactShadow = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({
+  map: canvasTex(128, 128, (x, Wd, H) => { const g = x.createRadialGradient(64, 64, 4, 64, 64, 64); g.addColorStop(0, 'rgba(0,0,0,0.75)'); g.addColorStop(0.6, 'rgba(0,0,0,0.3)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, Wd, H); }, false),
+  transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3
+}));
+contactShadow.renderOrder = 2; scene.add(contactShadow);
 function syncBike(dt) {
   const b = bike, m = model;
   // Spring-damped suspension: landings and bumps compress it, then it rebounds.
@@ -24,6 +30,10 @@ function syncBike(dt) {
   m.rider.rotation.set(b.riderLean + b.stand * 0.22 + Math.max(0, b.susp) * 1.6, 0, b.lean * 0.35 - (b.grounded ? 0 : (b.whip || 0)) * 0.4);
   m.rider.position.set(0, 1.02 + b.stand * 0.2 - Math.max(0, b.susp) * 0.8, -0.2 + b.stand * 0.06);
   poseRider(m);
+  m.root.updateMatrixWorld(); m.grimeU.uRootInv.value.copy(m.root.matrixWorld).invert();
+  const gy = groundH(b.x, b.z), lift = clamp((b.y - gy) / 4, 0, 1);
+  contactShadow.position.set(b.x, gy + 0.03, b.z); contactShadow.rotation.y = b.yaw;
+  contactShadow.scale.setScalar(bikeSpec.scale * (1 + lift * 0.6)); contactShadow.material.opacity = 0.85 * (1 - lift);
   const target = b.grounded ? b.speed : (keys.up ? 30 : b.spinW * 0.98);
   b.spinW = b.grounded ? b.speed : lerp(b.spinW, target, damp(2, dt));
   const rw = R_WHEEL * bikeSpec.scale;

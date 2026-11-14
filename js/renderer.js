@@ -118,6 +118,7 @@ function applyWorldLook() {
   u.turbidity.value = air.turbidity; u.rayleigh.value = air.rayleigh; u.mieCoefficient.value = air.mie;
   sun.color.copy(lin(W.sun));
   setPalette(W.pal);
+  if (typeof setGrimeColor === 'function') setGrimeColor();
   if (typeof foliageMat !== 'undefined') { const a = foliageAtlasFor(W.foliage); foliageMat.map = a; foliageDepth.map = a; foliageMat.needsUpdate = true; foliageDepth.needsUpdate = true; }
   waterMat.uniforms.uDeep.value.copy(lin(W.water.deep)); waterMat.uniforms.uShallow.value.copy(lin(W.water.shallow));
   waterMat.uniforms.uIce.value = W.water.ice;
