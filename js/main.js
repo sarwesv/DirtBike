@@ -58,6 +58,7 @@ function frame(now) {
     saveT += dt; if (saveT > 5) { saveT = 0; save(); }
     adaptQuality(dt);
   }
+  weatherTick(dt);
   updateFar(false);
   updateChunks(false);
   updateGrass(false);

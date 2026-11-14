@@ -18,6 +18,10 @@ Every map has races built from its own trail: Trail Sprint, Trail Marathon, Back
 
 Earn coins from tricks, flags, races and distance. Spend them in the garage to unlock bikes, maps and paint jobs. The Trail 250, Pit 125 and Open Country are free.
 
+## Time and weather
+
+On the title or pause screen, set the time to Day, Sunset, Night (stars, moonlight and a headlight) or a full day-night Cycle, and the weather to Clear, Rain (wet ground, puddles, less grip) or Snow. Auto weather snows on the Tundra and rains in the Wetlands.
+
 ## Project layout
 
 No build step. `index.html` loads the stylesheet, three.js from a CDN, then the game scripts in order. The scripts are plain (non-module) files that share one global scope, so the game also runs straight from disk by double-clicking `index.html`.
@@ -39,6 +43,7 @@ js/view.js          bike model sync and chase camera
 js/minimap.js       heading-up minimap
 js/hud.js           speedometer, gears, surface and score readouts
 js/race.js          races: trail routes, gates, timer, medals, ghosts
+js/weather.js       time of day, sky, stars, headlight, rain, snow, wet ground
 js/post.js          bloom, colour grade, vignette (desktop only)
 js/main.js          resize, adaptive quality, frame loop and start-up
 ```

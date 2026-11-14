@@ -27,7 +27,7 @@ const skyMat = new THREE.ShaderMaterial({
   uniforms: {
     sunPosition: { value: SUN_DIR.clone().multiplyScalar(4000) }, up: { value: new THREE.Vector3(0, 1, 0) },
     turbidity: { value: 6 }, rayleigh: { value: 1.6 }, mieCoefficient: { value: 0.004 }, mieDirectionalG: { value: 0.82 },
-    skyGain: { value: 0.42 }, fogCol: { value: HORIZON }, sunDisc: { value: 1 }
+    skyGain: { value: 0.42 }, fogCol: { value: HORIZON }, sunDisc: { value: 1 }, nightTint: { value: new THREE.Color(0, 0, 0) }
   },
   vertexShader: [
     'uniform vec3 sunPosition; uniform float rayleigh; uniform float turbidity; uniform float mieCoefficient; uniform vec3 up;',
@@ -49,7 +49,7 @@ const skyMat = new THREE.ShaderMaterial({
     '}'
   ].join('\n'),
   fragmentShader: [
-    'uniform float mieDirectionalG; uniform vec3 up; uniform float skyGain; uniform vec3 fogCol; uniform float sunDisc;',
+    'uniform float mieDirectionalG; uniform vec3 up; uniform float skyGain; uniform vec3 fogCol; uniform float sunDisc; uniform vec3 nightTint;',
     'varying vec3 vWorldPosition; varying vec3 vSunDirection; varying float vSunfade; varying vec3 vBetaR; varying vec3 vBetaM; varying float vSunE;',
     'const float pi = 3.141592653589793;',
     'const float rayleighZenithLength = 8.4E3; const float mieZenithLength = 1.25E3;',
@@ -71,7 +71,7 @@ const skyMat = new THREE.ShaderMaterial({
     '  vec3 L0 = vec3(0.1) * Fex;',
     '  L0 += (vSunE * 19000.0 * Fex) * smoothstep(sunAngularDiameterCos, sunAngularDiameterCos + 0.00002, cosTheta) * sunDisc;',
     '  vec3 texColor = (Lin + L0) * 0.04 + vec3(0.0, 0.0003, 0.00075);',
-    '  vec3 c = pow(texColor, vec3(1.0 / (1.2 + 1.2 * vSunfade))) * skyGain;',
+    '  vec3 c = pow(texColor, vec3(1.0 / (1.2 + 1.2 * vSunfade))) * skyGain + nightTint * (0.35 + 0.65 * max(direction.y, 0.0));',
     '  gl_FragColor = vec4(c, 1.0);',
     '  #include <tonemapping_fragment>',
     '  #include <encodings_fragment>',
@@ -89,7 +89,8 @@ function buildEnv() {
   const envSky = skyMat.clone(); envSky.toneMapped = false; envSky.uniforms.sunDisc.value = 0.002;
   envSky.uniforms.fogCol.value = lin(W.horizon);
   envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), envSky));
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 24), new THREE.MeshBasicMaterial({ color: lin('#5f5b40'), toneMapped: false }));
+  const dark = typeof nightness === 'number' ? nightness : 0;
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 24), new THREE.MeshBasicMaterial({ color: lin('#5f5b40').multiplyScalar(1 - dark * 0.92), toneMapped: false }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -3; envScene.add(ground);
   const pmrem = new THREE.PMREMGenerator(renderer);
   if (scene.environment) scene.environment.dispose();
@@ -120,7 +121,7 @@ function applyWorldLook() {
   if (typeof foliageMat !== 'undefined') { const a = foliageAtlasFor(W.foliage); foliageMat.map = a; foliageDepth.map = a; foliageMat.needsUpdate = true; foliageDepth.needsUpdate = true; }
   waterMat.uniforms.uDeep.value.copy(lin(W.water.deep)); waterMat.uniforms.uShallow.value.copy(lin(W.water.shallow));
   waterMat.uniforms.uIce.value = W.water.ice;
-  buildEnv();
+  if (typeof applyTimeOfDay === 'function') applyTimeOfDay(true); else buildEnv();
 }
 
 scene.add(new THREE.HemisphereLight(lin('#cfe2f7'), lin('#5b4c33'), 0.22));
@@ -230,6 +231,7 @@ function makeGroundTexture() {
 }
 const groundTex = makeGroundTexture();
 const detailTex = groundTex;
+const envU = { uWet: { value: 0 } };
 const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, map: groundTex, envMapIntensity: 0.75 });
 terrainMat.extensions = { derivatives: true };
 // Bump-map style normal perturbation from a height gradient in screen space (as three's bumpmap chunk does).
@@ -243,9 +245,10 @@ const PERTURB_GLSL = [
   '}'
 ].join('\n');
 terrainMat.onBeforeCompile = sh => {
-  sh.vertexShader = 'attribute float trail;\nattribute vec4 mw;\nvarying float vTrail;\nvarying vec4 vMw;\n' +
-    sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvTrail = trail;\nvMw = mw;');
-  sh.fragmentShader = 'varying float vTrail;\nvarying vec4 vMw;\n' + PERTURB_GLSL + '\n' + sh.fragmentShader
+  sh.uniforms.uWet = envU.uWet;
+  sh.vertexShader = 'attribute float trail;\nattribute vec4 mw;\nvarying float vTrail;\nvarying vec4 vMw;\nvarying float vUp;\n' +
+    sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvTrail = trail;\nvMw = mw;\nvUp = normal.y;');
+  sh.fragmentShader = 'uniform float uWet;\nvarying float vTrail;\nvarying vec4 vMw;\nvarying float vUp;\n' + PERTURB_GLSL + '\n' + sh.fragmentShader
     .replace('#include <map_fragment>', [
       'vec2 uvA = vUv * 0.8;',
       'vec4 tA = texture2D(map, uvA);',
@@ -275,7 +278,10 @@ terrainMat.onBeforeCompile = sh => {
       '  float rut = exp(-pow((td - 0.85) / 0.26, 2.0));',
       '  dirt *= (1.0 - rut * 0.4) * (1.0 + exp(-pow(td / 0.3, 2.0)) * 0.18);',
       '  diffuseColor.rgb = mix(diffuseColor.rgb, dirt, tm);',
-      '}'
+      '}',
+      // Rain: everything darkens; puddles collect in flat, low spots of soil and trail.
+      'float pud = uWet * smoothstep(0.6, 0.78, tB.g * 0.6 + tA.g * 0.4 + tm * 0.15) * smoothstep(0.975, 0.997, vUp) * (1.0 - lw.z);',
+      'diffuseColor.rgb *= (1.0 - uWet * 0.3) * (1.0 - pud * 0.6);'
     ].join('\n'))
     .replace('#include <normal_fragment_maps>', [
       '#include <normal_fragment_maps>',
@@ -286,9 +292,10 @@ terrainMat.onBeforeCompile = sh => {
       '  float amp = dot(lw, vec4(0.018, 0.03, 0.07, 0.025)) * (1.0 - smoothstep(40.0, 160.0, length(vViewPosition)));',
       '  vec2 dHdxy = vec2(dot(gUV, dFdx(uvA)), dot(gUV, dFdy(uvA))) * amp / 6.25;',
       '  normal = perturbGround(-vViewPosition, normal, dHdxy);',
+      '  normal = normalize(mix(normal, normalize(vNormal), pud));',
       '}'
     ].join('\n'))
-    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor - lw.z * 0.15 * tA.b - wN * 0.25, 0.4, 1.0);');
+    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor - lw.z * 0.15 * tA.b - wN * 0.25, 0.4, 1.0) * (1.0 - uWet * 0.4);\nroughnessFactor = mix(roughnessFactor, 0.03, pud);');
 };
 // Rocks reuse the rock layer of the same texture for colour and relief.
 const DETAIL_GLSL = 'vec4 tA = texture2D(map, vUv); diffuseColor.rgb *= 0.55 + tA.b * 0.75 + tA.g * 0.15;';
