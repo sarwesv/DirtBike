@@ -95,6 +95,12 @@ function rawHeight(x, z) {
   const td = trailDistS(x, z, mount * padK), ad = Math.abs(td);
   lastTrailD = td;
   if (ad < TR_HALF + 6) h = lerp(h, hs - 0.18, (1 - smooth(TR_HALF, TR_HALF + 6, ad)) * smooth(WATER - 0.5, WATER + 1.5, hs));
+  const mo = mxOutside(x, z);
+  if (mo < 34) {
+    h = lerp(h, 9 + W.base + mxBank(x, z) + bumps * 0.15, 1 - smooth(14, 34, mo));
+    const md = mxDist(x, z);
+    if (md < 8) { const m = Math.max(0, md - 2.2); if (m < Math.abs(lastTrailD)) lastTrailD = m; }
+  }
   return h;
 }
 const gridH = (ix, iz) => rawHeight(ix * CELL, iz * CELL);
@@ -108,24 +114,54 @@ function terrainH(x, z) {
 function slopeAt(x, z) { return (Math.abs(rawHeight(x + 2, z) - rawHeight(x - 2, z)) + Math.abs(rawHeight(x, z + 2) - rawHeight(x, z - 2))) / 4; }
 
 /* ---------- Ramps ---------- */
-function makeRamp(x, z, a, L, W, H) {
+function makeRamp(x, z, a, L, W, H, kind = 'kick') {
   const sa = Math.sin(a), ca = Math.cos(a);
   const pts = [[-L / 2, -W / 2], [-L / 2, W / 2], [L / 2, -W / 2], [L / 2, W / 2], [0, 0]];
   let lo = Infinity, hi = -Infinity;
   for (const [u, w] of pts) { const h = terrainH(x + sa * u + ca * w, z + ca * u - sa * w); lo = Math.min(lo, h); hi = Math.max(hi, h); }
-  return { x, z, a, sa, ca, L, W, H, base: lo - 0.05, spread: hi - lo };
+  return { x, z, a, sa, ca, L, W, H, kind, base: lo - 0.05, spread: hi - lo };
+}
+// Ramp shapes along their length t in 0..1: kicker, rounded whoop, tabletop, flat deck.
+function rampProfile(kind, t) {
+  if (kind === 'arch') return Math.sin(t * Math.PI);
+  if (kind === 'table') return t < 0.3 ? smooth(0, 0.3, t) : t > 0.75 ? 1 - smooth(0.75, 1, t) : 1;
+  return 1 - Math.cos(t * Math.PI / 2);
 }
 function rampH(r, x, z) {
   const dx = x - r.x, dz = z - r.z, u = dx * r.sa + dz * r.ca, w = dx * r.ca - dz * r.sa;
   if (u < -r.L / 2 || u > r.L / 2 || w < -r.W / 2 || w > r.W / 2) return -Infinity;
   const t = (u + r.L / 2) / r.L;
-  return r.base + r.H * (1 - Math.cos(t * Math.PI / 2));
+  if (r.kind === 'deck') return lerp(r.h0, r.h1, t);
+  return r.base + r.H * rampProfile(r.kind, t);
 }
 const PRESET_RAMPS = [
   [0, 40, 0, 12, 4.5, 3], [0, 72, Math.PI, 14, 5, 3], [-45, 25, -0.5, 10, 4, 2.2],
   [40, 15, 0.45, 15, 5, 4.4], [-20, -45, Math.PI, 9, 4, 1.6], [55, -35, 2.2, 11, 4.5, 2.8]
 ];
 const PRESET_FLAGS = [[0, 104], [-72, 52], [66, 70]];
+
+/* Motocross park: a stadium-shaped loop west of the start. Straights run along x at z = 0 and z = 60,
+   with banked turns of radius 30 at each end. */
+const MX = { x0: -230, x1: -150, z0: 0, z1: 60, cz: 30, r: 30 };
+function mxEnd(x) { return x < MX.x0 ? MX.x0 : MX.x1; }
+function mxDist(x, z) {
+  if (x >= MX.x0 && x <= MX.x1) return Math.min(Math.abs(z - MX.z0), Math.abs(z - MX.z1));
+  return Math.abs(Math.hypot(x - mxEnd(x), z - MX.cz) - MX.r);
+}
+function mxOutside(x, z) {
+  const s = x >= MX.x0 && x <= MX.x1 ? Math.abs(z - MX.cz) - MX.r : Math.hypot(x - mxEnd(x), z - MX.cz) - MX.r;
+  return Math.max(0, s);
+}
+// Berms: the outside of each turn rises up to 1.8 m, eased in from the straights.
+function mxBank(x, z) {
+  if (x >= MX.x0 && x <= MX.x1) return 0;
+  const cx = mxEnd(x), r = Math.hypot(x - cx, z - MX.cz), into = Math.abs(x - cx);
+  return smooth(MX.r - 3, MX.r + 6, r) * smooth(MX.r + 15, MX.r + 9, r) * 1.8 * smooth(0, 10, into);
+}
+const inMX = (x, z) => mxOutside(x, z) < 26;
+const MX_RAMPS = [];
+for (let k = 0; k < 8; k++) MX_RAMPS.push([-215 + k * 6, 0, Math.PI / 2, 6, 7, 0.7, 'arch']);
+MX_RAMPS.push([-165, 60, -Math.PI / 2, 22, 7, 2.4, 'table'], [-188, 60, -Math.PI / 2, 8, 6, 2.0, 'kick'], [-206, 60, Math.PI / 2, 10, 6, 2.0, 'kick']);
 
 /* ---------- Deterministic chunk contents ---------- */
 const dataCache = new Map();
@@ -135,19 +171,21 @@ function getChunkData(cx, cz) {
   if (d) return d;
   const seed = (Math.imul(cx, 73856093) ^ Math.imul(cz, 19349663) ^ 0x5bd1e995) >>> 0;
   const rng = mulberry32(seed);
-  d = { trees: [], oaks: [], cacti: [], rocks: [], bushes: [], ramps: [], flags: [], obs: [] };
+  d = { trees: [], oaks: [], cacti: [], rocks: [], bushes: [], ramps: [], flags: [], obs: [], cabins: [], caches: [], keep: [] };
   const x0 = cx * CS, z0 = cz * CS;
   const inChunk = (x, z) => x >= x0 && x < x0 + CS && z >= z0 && z < z0 + CS;
   PRESET_RAMPS.forEach(p => { if (inChunk(p[0], p[1])) d.ramps.push(makeRamp(...p)); });
+  MX_RAMPS.forEach(p => { if (inChunk(p[0], p[1])) d.ramps.push(makeRamp(...p)); });
   PRESET_FLAGS.forEach((p, i) => { if (inChunk(p[0], p[1])) d.flags.push({ id: flagPrefix() + 'p' + i, x: p[0], z: p[1], y: terrainH(p[0], p[1]) }); });
   for (let i = 0; i < 2; i++) {
     const roll = rng(), x = x0 + 15 + rng() * (CS - 30), z = z0 + 15 + rng() * (CS - 30), a = rng() * TAU, L = 9 + rng() * 6, W = 4 + rng() * 1.5, H = 1.6 + rng() * 2.4;
-    if (roll > 0.38 || Math.hypot(x, z) < 110) continue;
+    if (roll > 0.38 || Math.hypot(x, z) < 110 || inMX(x, z)) continue;
     if (rawHeight(x, z) < WATER + 1.5 || slopeAt(x, z) > 0.18) continue;
     const r = makeRamp(x, z, a, L, W, H);
     if (r.spread < H * 0.45 && r.base > WATER + 0.6) d.ramps.push(r);
   }
-  const nearRamp = (x, z) => d.ramps.some(r => (x - r.x) ** 2 + (z - r.z) ** 2 < (r.L * 0.75 + 3) ** 2) ||
+  addLandmarks(d, cx, cz, seed, inChunk);
+  const nearRamp = (x, z) => inMX(x, z) || d.keep.some(k => (x - k[0]) ** 2 + (z - k[1]) ** 2 < k[2] * k[2]) || d.ramps.some(r => (x - r.x) ** 2 + (z - r.z) ** 2 < (r.L * 0.75 + 3) ** 2) ||
     PRESET_RAMPS.some(p => (x - p[0]) ** 2 + (z - p[1]) ** 2 < 144);
   const treeTries = Math.round(W.trees * (coarse ? 0.7 : 1));
   for (let i = 0; i < treeTries; i++) {
@@ -181,6 +219,7 @@ function getChunkData(cx, cz) {
     for (let t = 0; t < 8; t++) {
       const x = x0 + 10 + rng() * (CS - 20), z = z0 + 10 + rng() * (CS - 20);
       if (Math.hypot(x, z) < 130 || rawHeight(x, z) < WATER + 1 || nearRamp(x, z)) continue;
+      if (d.keep.some(k => (x - k[0]) ** 2 + (z - k[1]) ** 2 < (k[2] + 6) ** 2)) continue;
       if (d.obs.some(o => (o.x - x) ** 2 + (o.z - z) ** 2 < 25)) continue;
       d.flags.push({ id: flagPrefix() + key + ':' + t, x, z, y: terrainH(x, z) });
       break;
@@ -199,6 +238,50 @@ function getChunkData(cx, cz) {
   }
   dataCache.set(key, d);
   return d;
+}
+/* ---------- Landmarks: bridges, cabins, hidden jump lines with coin caches ---------- */
+// They use their own random stream so adding them never moves existing trees, rocks or flags.
+function addLandmarks(d, cx, cz, seed, inChunk) {
+  const r3 = mulberry32((seed ^ 0x3c3c3c3c) >>> 0), x0 = cx * CS, z0 = cz * CS, key = cx + ',' + cz;
+  const trailDir = (x, z) => { const e = 0.7, gx = trailSigned(x + e, z) - trailSigned(x - e, z), gz = trailSigned(x, z + e) - trailSigned(x, z - e), l = Math.hypot(gx, gz) || 1; return [-gz / l, gx / l]; };
+  // Bridges where the trail runs into a lake: find both banks along the trail and span them with a deck.
+  if (!W.ice) {
+    for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++) {
+      const x = x0 + (i + 0.5) * CS / 16, z = z0 + (j + 0.5) * CS / 16;
+      if (Math.abs(trailSigned(x, z)) > 4 || rawHeight(x, z) > WATER + 0.2 || Math.abs(trailAt(x, z)) > 20) continue;
+      const [tx, tz] = trailDir(x, z), bank = s => { for (let k = 1; k <= 35; k++) { if (rawHeight(x + tx * s * k * 2, z + tz * s * k * 2) > WATER + 0.8) return k * 2; } return null; };
+      const da = bank(1), db = bank(-1);
+      if (da === null || db === null) continue;
+      const ax = x + tx * (da + 3), az = z + tz * (da + 3), bx = x - tx * (db + 3), bz = z - tz * (db + 3);
+      const mx = (ax + bx) / 2, mz = (az + bz) / 2, L = Math.hypot(ax - bx, az - bz);
+      if (L > 90 || !inChunk(mx, mz) || d.ramps.some(r => r.kind === 'deck' && (r.x - mx) ** 2 + (r.z - mz) ** 2 < 900)) continue;
+      const a = Math.atan2(ax - bx, az - bz), h0 = Math.max(terrainH(bx, bz), WATER + 0.5) + 0.28, h1 = Math.max(terrainH(ax, az), WATER + 0.5) + 0.28;
+      d.ramps.push({ kind: 'deck', x: mx, z: mz, a, sa: Math.sin(a), ca: Math.cos(a), L, W: 5, H: 0, h0, h1, base: Math.min(h0, h1) });
+      d.keep.push([mx, mz, L / 2 + 4]);
+    }
+  }
+  const okGround = (x, z) => { const h = rawHeight(x, z); return h > WATER + 1.5 && h < W.treeLine + 10 && !inMX(x, z) && Math.hypot(x, z) > 140 && Math.abs(lastTrailD) > 9; };
+  // Log cabins on gentle, dry ground.
+  if (r3() < 0.14) for (let t = 0; t < 4; t++) {
+    const x = x0 + 20 + r3() * (CS - 40), z = z0 + 20 + r3() * (CS - 40), rot = r3();
+    if (!okGround(x, z) || slopeAt(x, z) > 0.12 || d.keep.some(k => (x - k[0]) ** 2 + (z - k[1]) ** 2 < (k[2] + 8) ** 2)) continue;
+    const y = Math.min(terrainH(x - 3, z - 3), terrainH(x + 3, z + 3), terrainH(x, z)) - 0.15;
+    d.cabins.push({ x, z, y, rot }); d.obs.push({ x, z, y, r: 3.6, top: 6, kind: 'cabin' }); d.keep.push([x, z, 9]);
+    break;
+  }
+  // Hidden jump line: kicker, landing, tabletop, then a glowing coin cache.
+  if (r3() < 0.13) for (let t = 0; t < 4; t++) {
+    const x = x0 + 40 + r3() * (CS - 80), z = z0 + 40 + r3() * (CS - 80), a = r3() * TAU, fx = Math.sin(a), fz = Math.cos(a);
+    const pts = [0, 22, 44, 64].map(s => [x + fx * s, z + fz * s]);
+    if (!pts.every(([px, pz]) => okGround(px, pz) && slopeAt(px, pz) < 0.2)) continue;
+    const hs = pts.map(([px, pz]) => rawHeight(px, pz));
+    if (Math.max(...hs) - Math.min(...hs) > 3) continue;
+    d.ramps.push(makeRamp(pts[0][0], pts[0][1], a, 10, 5, 2.6, 'kick'), makeRamp(pts[1][0], pts[1][1], a + Math.PI, 12, 5.5, 2.6, 'kick'), makeRamp(pts[2][0], pts[2][1], a, 16, 5.5, 2.2, 'table'));
+    const c = pts[3];
+    d.caches.push({ id: flagPrefix() + 'c' + key, x: c[0], z: c[1], y: terrainH(c[0], c[1]) });
+    for (const p of pts) d.keep.push([p[0], p[1], 9]);
+    break;
+  }
 }
 let nearRamps = [];
 function rampsAround(x, z) {

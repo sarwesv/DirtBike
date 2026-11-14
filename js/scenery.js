@@ -355,21 +355,71 @@ const poleMat = new THREE.MeshStandardMaterial({ color: lin('#d9d4c7'), metalnes
 const clothMat = new THREE.MeshStandardMaterial({ color: lin('#ffcf33'), emissive: lin('#ffb000'), emissiveIntensity: 0.6, side: THREE.DoubleSide, roughness: 0.6 });
 const beamMat = new THREE.MeshBasicMaterial({ color: lin('#ffd84a'), transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
 
+// Timber bridge: plank deck following h0 -> h1, side rails and posts down into the water.
+function buildDeckMesh(r) {
+  const pos = [], col = [], hw = r.W / 2, n = Math.max(4, Math.round(r.L / 1.2));
+  const plank = [L3('#8a6440'), L3('#7a5636'), L3('#946d46')], beam = L3('#4f3a28');
+  const quad = (a, b, c, d, cc) => { pos.push(...a, ...b, ...c, ...a, ...c, ...d); for (let i = 0; i < 6; i++) col.push(...cc); };
+  const hAt = t => lerp(r.h0, r.h1, t) - r.base;
+  const box = (x0, x1, y0, y1, u0, u1, cc) => {
+    quad([x0, y1, u0], [x1, y1, u0], [x1, y1, u1], [x0, y1, u1], cc); quad([x0, y0, u0], [x0, y1, u0], [x0, y1, u1], [x0, y0, u1], cc);
+    quad([x1, y1, u0], [x1, y0, u0], [x1, y0, u1], [x1, y1, u1], cc); quad([x0, y0, u0], [x1, y0, u0], [x1, y1, u0], [x0, y1, u0], cc);
+    quad([x1, y0, u1], [x0, y0, u1], [x0, y1, u1], [x1, y1, u1], cc);
+  };
+  for (let k = 0; k < n; k++) {
+    const t0 = k / n, t1 = (k + 0.92) / n, u0 = -r.L / 2 + t0 * r.L, u1 = -r.L / 2 + t1 * r.L, y = hAt((t0 + t1) / 2);
+    box(-hw, hw, y - 0.12, y, u0, u1, plank[k % 3].map(v => v * (0.9 + hash01(r.x + k, r.z) * 0.2)));
+  }
+  for (const sx of [-hw - 0.08, hw - 0.04]) for (let k = 0; k <= Math.round(r.L / 3); k++) {
+    const t = k / Math.round(r.L / 3), u = -r.L / 2 + t * r.L, y = hAt(t);
+    box(sx, sx + 0.12, y, y + 1.0, u - 0.07, u + 0.07, beam);
+    if (k % 2 === 0) box(sx, sx + 0.16, WATER - 2.5 - r.base, y - 0.12, u - 0.1, u + 0.1, beam);
+  }
+  for (const sx of [-hw - 0.08, hw - 0.04]) for (let k = 0; k < Math.round(r.L / 3); k++) {
+    const t0 = k / Math.round(r.L / 3), t1 = (k + 1) / Math.round(r.L / 3);
+    const u0 = -r.L / 2 + t0 * r.L, u1 = -r.L / 2 + t1 * r.L, y0 = hAt(t0) + 0.92, y1 = hAt(t1) + 0.92;
+    quad([sx, y0, u0], [sx + 0.12, y0, u0], [sx + 0.12, y1, u1], [sx, y1, u1], beam);
+    quad([sx, y0 - 0.08, u0], [sx, y0, u0], [sx, y1, u1], [sx, y1 - 0.08, u1], beam);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, rampMat);
+  m.position.set(r.x, r.base, r.z); m.rotation.y = r.a; m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+// Log cabin: walls, pitched roof, door, windows and a stone chimney.
+const CABIN = mergeParts([
+  [new THREE.BoxGeometry(6, 3, 4.6), '#7a5232', mtx(0, 1.5, 0)],
+  [new THREE.BoxGeometry(6.4, 0.25, 3.4), '#4a3a2e', mtx(0, 3.8, 1.25, 0.62, 0, 0)],
+  [new THREE.BoxGeometry(6.4, 0.25, 3.4), '#4a3a2e', mtx(0, 3.8, -1.25, -0.62, 0, 0)],
+  [new THREE.CylinderGeometry(2.3, 2.3, 6, 3, 1), '#6e4a2d', mtx(0, 3.4, 0, 0, 0, Math.PI / 2, 1, 0.55, 1)],
+  [new THREE.BoxGeometry(1.1, 2, 0.12), '#3b2a1c', mtx(0.8, 1.0, 2.33)],
+  [new THREE.BoxGeometry(1.0, 0.9, 0.1), '#a9c4d4', mtx(-1.6, 1.7, 2.32)],
+  [new THREE.BoxGeometry(0.1, 0.9, 1.0), '#a9c4d4', mtx(3.02, 1.7, 0)],
+  [new THREE.BoxGeometry(0.9, 4.4, 0.9), '#8b867c', mtx(-2.3, 3.0, -1.2)],
+  [new THREE.BoxGeometry(6.6, 0.3, 5.2), '#5a5248', mtx(0, 0.1, 0)]
+]);
+const CRATE = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+const crateMat = new THREE.MeshStandardMaterial({ color: lin('#ffcf33'), emissive: lin('#ffb000'), emissiveIntensity: 1.1, roughness: 0.35, metalness: 0.4 });
 function buildRampMesh(r) {
   const pos = [], col = [], S = 12, BOT = -3, hw = r.W / 2;
-  const wood = [L3('#b07a43'), L3('#9a6738')], side = L3('#6f4a2b'), rail = L3('#3b3b3e');
+  if (r.kind === 'deck') return buildDeckMesh(r);
+  const dirt = r.kind === 'arch' || r.kind === 'table';
+  const wood = dirt ? [L3('#7a5636'), L3('#6f4c2f')] : [L3('#b07a43'), L3('#9a6738')], side = dirt ? L3('#5e4129') : L3('#6f4a2b'), rail = L3('#3b3b3e');
   const quad = (a, b, c, d, cc) => { pos.push(...a, ...b, ...c, ...a, ...c, ...d); for (let i = 0; i < 6; i++) col.push(...cc); };
-  const prof = t => r.H * (1 - Math.cos(t * Math.PI / 2));
+  const prof = t => r.H * rampProfile(r.kind, t);
   for (let k = 0; k < S; k++) {
     const t0 = k / S, t1 = (k + 1) / S, u0 = -r.L / 2 + t0 * r.L, u1 = -r.L / 2 + t1 * r.L, h0 = prof(t0), h1 = prof(t1);
     const shade = wood[k % 2].map(v => v * (0.92 + hash01(r.x + k, r.z) * 0.16));
     quad([-hw, h0, u0], [hw, h0, u0], [hw, h1, u1], [-hw, h1, u1], shade);
     quad([-hw, BOT, u0], [-hw, h0, u0], [-hw, h1, u1], [-hw, BOT, u1], side);
     quad([hw, h0, u0], [hw, BOT, u0], [hw, BOT, u1], [hw, h1, u1], side);
-    for (const sx of [-hw, hw - 0.12]) quad([sx, h0 + 0.06, u0], [sx + 0.12, h0 + 0.06, u0], [sx + 0.12, h1 + 0.06, u1], [sx, h1 + 0.06, u1], rail);
+    if (!dirt) for (const sx of [-hw, hw - 0.12]) quad([sx, h0 + 0.06, u0], [sx + 0.12, h0 + 0.06, u0], [sx + 0.12, h1 + 0.06, u1], [sx, h1 + 0.06, u1], rail);
   }
   const L2 = r.L / 2;
-  quad([-hw, BOT, L2], [-hw, r.H, L2], [hw, r.H, L2], [hw, BOT, L2], side);
+  if (r.kind === 'kick') quad([-hw, BOT, L2], [-hw, r.H, L2], [hw, r.H, L2], [hw, BOT, L2], side);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -396,6 +446,16 @@ function buildChunk(cx, cz) {
   ].filter(Boolean);
   inst.forEach(m => group.add(m));
   d.ramps.forEach(r => group.add(buildRampMesh(r)));
+  for (const c of d.cabins) {
+    const m = new THREE.Mesh(CABIN, instMat); m.position.set(c.x, c.y, c.z); m.rotation.y = c.rot * TAU;
+    m.castShadow = true; m.receiveShadow = true; group.add(m);
+  }
+  const cacheObjs = new Map();
+  for (const c of d.caches) {
+    if (prog.caches.includes(c.id)) continue;
+    const m = new THREE.Mesh(CRATE, crateMat); m.position.set(c.x, c.y + 1.1, c.z); m.castShadow = true;
+    group.add(m); cacheObjs.set(c.id, m);
+  }
   const flagObjs = new Map();
   d.flags.forEach(f => {
     if (collected.has(f.id)) return;
@@ -408,7 +468,7 @@ function buildChunk(cx, cz) {
     group.add(fg); flagObjs.set(f.id, fg);
   });
   scene.add(group);
-  chunks.set(cx + ',' + cz, { group, terrain, inst, flagObjs, cx, cz });
+  chunks.set(cx + ',' + cz, { group, terrain, inst, flagObjs, cacheObjs, cx, cz });
 }
 function disposeChunk(k) {
   const ch = chunks.get(k);

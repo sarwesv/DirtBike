@@ -23,7 +23,7 @@ function surfaceAt(x, z, depth) {
   if (W.ice && th < WATER) return SURF.ice;
   if (depth > 0) return SURF.water;
   if (groundH(x, z) > th + 0.05) return SURF.ramp;
-  if (Math.abs(trailAt(x, z)) < TR_HALF + 0.4) return wetness > 0.6 ? SURF.mud : SURF.trail;
+  if (Math.abs(trailAt(x, z)) < TR_HALF + 0.4 || mxDist(x, z) < 4.6) return wetness > 0.6 ? SURF.mud : SURF.trail;
   if (th > W.snowLine + 6) return SURF.snow;
   if (W.id === 'swamp' && th < WATER + 1.6) return SURF.mud;
   if (desertness(x, z) > 0.5) return SURF.sand;
@@ -96,10 +96,22 @@ function collide() {
       const dx = bike.x - o.x, dz = bike.z - o.z, rr = o.r + 0.5;
       if (dx * dx + dz * dz > rr * rr || bike.y > o.y + o.top || bike.y + 1.7 < o.y) continue;
       const hs = bike.grounded ? Math.abs(bike.speed) : Math.hypot(bike.vx, bike.vz);
-      if (hs > 8.5) return crash(o.kind === 'tree' ? 'Met a pine tree head-on' : o.kind === 'cactus' ? 'Hugged a cactus' : 'Hit a boulder');
+      if (hs > 8.5) return crash(o.kind === 'tree' ? 'Met a pine tree head-on' : o.kind === 'cactus' ? 'Hugged a cactus' : o.kind === 'cabin' ? 'Rode into a cabin wall' : 'Hit a boulder');
       const dd = Math.sqrt(dx * dx + dz * dz) || 0.01;
       bike.x = o.x + dx / dd * rr; bike.z = o.z + dz / dd * rr;
       bike.speed *= -0.25; bike.vx *= -0.25; bike.vz *= -0.25;
+    }
+  }
+}
+function checkCaches() {
+  const pcx = Math.floor(bike.x / CS), pcz = Math.floor(bike.z / CS);
+  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+    const ch = chunks.get((pcx + i) + ',' + (pcz + j));
+    for (const c of getChunkData(pcx + i, pcz + j).caches) {
+      if (prog.caches.includes(c.id) || (bike.x - c.x) ** 2 + (bike.z - c.z) ** 2 > 9 || Math.abs(bike.y - c.y) > 4) continue;
+      prog.caches.push(c.id); earn(150);
+      const m = ch && ch.cacheObjs.get(c.id); if (m) { ch.group.remove(m); ch.cacheObjs.delete(c.id); }
+      flash(el.trick, `Hidden cache<small>Found a jump line's stash · +150 coins</small>`); chime(); burst(20, 1);
     }
   }
 }
@@ -132,7 +144,7 @@ function step(dt) {
     return;
   }
   const inp = keys;
-  const terr = terrainH(b.x, b.z), depth = W.ice ? 0 : WATER - terr;
+  const terr = terrainH(b.x, b.z), onDeck = groundH(b.x, b.z) > terr + 0.05, depth = W.ice || onDeck ? 0 : WATER - terr;
   if (b.grounded) {
     const sy = Math.sin(b.yaw), cy = Math.cos(b.yaw);
     const slopeAng = Math.atan2(groundH(b.x + sy * 0.75, b.z + cy * 0.75) - groundH(b.x - sy * 0.75, b.z - cy * 0.75), 1.5);
@@ -212,6 +224,7 @@ function step(dt) {
   if (!b.crashed) collide();
   if (!b.crashed) checkFlags();
   if (!b.crashed) raceStep();
+  if (!b.crashed) checkCaches();
   b.nitro = Math.min(1, b.nitro + 0.02 * dt);
   histT += dt;
   if (histT > 0.3) { histT = 0; if (b.grounded && !b.crashed && depth <= 0 && Math.abs(b.speed) > 1) { hist.push({ x: b.x, z: b.z, yaw: b.yaw }); if (hist.length > 10) hist.shift(); } }

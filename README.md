@@ -22,6 +22,10 @@ Earn coins from tricks, flags, races and distance. Spend them in the garage to u
 
 On the title or pause screen, set the time to Day, Sunset, Night (stars, moonlight and a headlight) or a full day-night Cycle, and the weather to Clear, Rain (wet ground, puddles, less grip) or Snow. Auto weather snows on the Tundra and rains in the Wetlands.
 
+## Landmarks
+
+Every map has a motocross park west of the start with whoops, a tabletop, a double and banked berms (and its own 3-lap MX Track race). Timber bridges carry the trail over lakes, log cabins dot the countryside, and hidden jump lines end in a glowing coin cache worth 150 coins.
+
 ## Project layout
 
 No build step. `index.html` loads the stylesheet, three.js from a CDN, then the game scripts in order. The scripts are plain (non-module) files that share one global scope, so the game also runs straight from disk by double-clicking `index.html`.
@@ -62,6 +66,7 @@ Open `index.html` in a browser, or serve the folder with any static server (e.g.
 | S / ↓ | Brake, reverse | Lean back (backflip) |
 | A D / ← → | Steer | Spin |
 | Space | Wheelie | Lean back |
+| Q / E | | Whip (or Space + steer) |
 | Shift | Nitro | |
 | R / C / M / Esc | Reset bike / camera / sound / pause | |
 

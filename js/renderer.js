@@ -274,7 +274,7 @@ terrainMat.onBeforeCompile = sh => {
     .replace('#include <color_fragment>', [
       '#include <color_fragment>',
       'if (tm > 0.0) {',
-      '  vec3 dirt = vec3(0.2, 0.125, 0.07) * (0.55 + smoothstep(0.1, 0.9, tA.g) * 0.75) * (0.85 + tB.g * 0.3);',
+      '  vec3 dirt = vec3(0.2, 0.125, 0.07) * (0.78 + tA.g * 0.3 + tC.r * 0.18) * (0.85 + tB.g * 0.3);',
       '  float rut = exp(-pow((td - 0.85) / 0.26, 2.0));',
       '  dirt *= (1.0 - rut * 0.4) * (1.0 + exp(-pow(td / 0.3, 2.0)) * 0.18);',
       '  diffuseColor.rgb = mix(diffuseColor.rgb, dirt, tm);',

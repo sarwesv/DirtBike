@@ -75,6 +75,7 @@ function frame(now) {
   updClouds();
   sky.position.copy(camera.position);
   beamMat.opacity = 0.12 + Math.sin(time * 2.4) * 0.05;
+  for (const ch of chunks.values()) for (const c of ch.cacheObjs.values()) { c.rotation.y = time * 1.5; c.position.y += Math.sin(time * 2.5) * 0.004; }
   for (const ch of chunks.values()) for (const fg of ch.flagObjs.values()) fg.userData.cloth.rotation.y = Math.sin(time * 3 + fg.position.x) * 0.35;
   mapT -= dt; nearestT -= dt;
   if (nearestT <= 0) { nearestT = 0.6; findNearest(); }

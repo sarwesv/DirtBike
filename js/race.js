@@ -26,8 +26,14 @@ const EVENTS = [
   { id: 'sprint', name: 'Trail Sprint', build: () => trailRoute(1, 1200) },
   { id: 'marathon', name: 'Trail Marathon', build: () => trailRoute(1, 3000) },
   { id: 'back', name: 'Backtrail', build: () => trailRoute(-1, 1500) },
-  { id: 'loop', name: 'Meadow Loop', build: () => loopRoute() }
+  { id: 'loop', name: 'Meadow Loop', build: () => loopRoute() },
+  { id: 'mx', name: 'MX Track', build: () => mxRoute() }
 ];
+// Three laps of the motocross park: whoops on the south straight, tabletop and double on the north.
+function mxRoute() {
+  const lap = [[-200, 0], [-160, 0], [-120, 30], [-160, 60], [-200, 60], [-260, 30], [-226, 0]];
+  return { start: [-236, 0], cps: lap.concat(lap, lap), laps: 3 };
+}
 function trailRoute(dir, len) {
   let pts = traceTrail(20, 10, dir, len);
   if (pts.length < 150) pts = traceTrail(20, 10, -dir, len); // blocked by a lake or ridge: ride it the other way
@@ -90,6 +96,7 @@ function startRace(i) {
   endRace(false);
   const ev = EVENTS[i], r = ev.build(), L = routeLength(r);
   const s = r.start, c0 = r.cps[0], yaw = Math.atan2(c0[0] - s[0], c0[1] - s[1]);
+  refreshNearRamps(s[0], s[1]);
   bike.x = s[0]; bike.z = s[1]; bike.yaw = yaw; hist.length = 0;
   resetBike(false);
   const gates = r.cps.map((c, k) => {

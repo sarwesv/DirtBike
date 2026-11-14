@@ -19,10 +19,10 @@ const PAINTS = [
 
 /* ---------- Save ---------- */
 const PROG_KEY = 'ridgeline-moto-progress';
-const prog = { coins: 300, bikes: ['trail', 'pit'], worlds: ['open'], paints: ['stock'], paint: 'stock' };
+const prog = { coins: 300, bikes: ['trail', 'pit'], worlds: ['open'], paints: ['stock'], paint: 'stock', caches: [] };
 try {
   const s = JSON.parse(localStorage.getItem(PROG_KEY) || 'null');
-  if (s) Object.assign(prog, s);
+  if (s) { Object.assign(prog, s); prog.caches = prog.caches || []; }
   else {
     // First run with progression: keep whatever this player was already riding.
     if (!prog.bikes.includes(savedBike)) prog.bikes.push(savedBike);
