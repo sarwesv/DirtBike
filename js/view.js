@@ -6,15 +6,20 @@
 /* ---------- Visual sync ---------- */
 function syncBike(dt) {
   const b = bike, m = model;
-  b.susp = lerp(b.susp, 0, damp(8, dt));
+  // Spring-damped suspension: landings and bumps compress it, then it rebounds.
+  const sdt = Math.min(dt, 0.033);
+  b.suspV = (b.suspV || 0) + (-(b.susp || 0) * 170 - (b.suspV || 0) * 15) * sdt;
+  b.susp = clamp((b.susp || 0) + b.suspV * sdt, -0.06, 0.24);
   m.root.position.set(b.x, b.y - b.susp, b.z);
-  m.root.rotation.set(-b.pitch, b.yaw, b.lean + (b.crashed ? b.roll : 0));
+  m.root.rotation.set(-b.pitch, b.yaw, b.lean + (b.grounded ? 0 : (b.whip || 0)) + (b.crashed ? b.roll : 0) - clamp((b.slide || 0) * 0.02, -0.25, 0.25));
   m.wheelie.rotation.x = -b.wheelie;
   m.steer.rotation.y = -b.steer * 0.35;
   // Rider tucks forward on the gas, sits back for wheelies and into the turn.
   const lean = b.crashed ? 0.5 : b.grounded ? (keys.up ? 0.16 : 0.05) - b.wheelie * 0.5 : 0.1 - b.pitchVel * 0.03;
   b.riderLean = lerp(b.riderLean || 0, lean, damp(5, dt));
-  m.rider.rotation.set(b.riderLean, 0, b.lean * 0.35);
+  // Brace into landings: the rider sinks and pitches forward with the suspension.
+  m.rider.rotation.set(b.riderLean + Math.max(0, b.susp) * 1.6, 0, b.lean * 0.35 - (b.grounded ? 0 : (b.whip || 0)) * 0.4);
+  m.rider.position.y = 1.02 - Math.max(0, b.susp) * 0.8;
   const target = b.grounded ? b.speed : (keys.up ? 30 : b.spinW * 0.98);
   b.spinW = b.grounded ? b.speed : lerp(b.spinW, target, damp(2, dt));
   const rw = R_WHEEL * bikeSpec.scale;
@@ -26,7 +31,7 @@ function bikeParticles(dt) {
   const b = bike;
   if (!b.grounded || b.crashed) return;
   const sp = Math.abs(b.speed);
-  const rate = (keys.up && sp > 0.5 ? 18 + sp * 2.2 : 0) + (keys.down && sp > 4 ? 25 : 0) + (b.boosting ? 20 : 0);
+  const rate = (keys.up && sp > 0.5 ? 18 + sp * 2.2 : 0) + (keys.down && sp > 4 ? 25 : 0) + (b.boosting ? 20 : 0) + (b.drifting ? 30 + Math.abs(b.slide) * 4 : 0);
   emitAcc += rate * dt;
   const sy = Math.sin(b.yaw), cy = Math.cos(b.yaw);
   const rx = b.x - sy * 0.75, rz = b.z - cy * 0.75, c = dustColor(rx, rz);

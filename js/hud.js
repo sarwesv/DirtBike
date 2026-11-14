@@ -17,14 +17,7 @@ function updHud() {
   setText('best', best.toLocaleString());
   setText('flags', String(collected.size));
   setText('odo', (odo / 1000).toFixed(1) + ' km');
-  let surf = 'Grass';
-  if (!b.grounded) surf = 'Airborne';
-  else if (terrainH(b.x, b.z) < WATER) surf = 'Water';
-  else if (groundH(b.x, b.z) > terrainH(b.x, b.z) + 0.05) surf = 'Ramp';
-  else if (b.onTrail) surf = 'Trail';
-  else if (b.y > 64) surf = 'Snow';
-  else if (mountainMask(b.x, b.z) > 0.45 && b.y > 40) surf = 'Rock';
-  else if (desertness(b.x, b.z) > 0.5) surf = 'Sand';
+  let surf = !b.grounded ? 'Airborne' : (b.surface || 'Grass') + (b.drifting ? ' · sliding' : '');
   if (shown.surf !== surf) el.surf.classList.toggle('trail', surf === 'Trail');
   setText('surf', surf);
   el.nitro.style.width = (b.nitro * 100).toFixed(1) + '%';

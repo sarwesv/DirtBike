@@ -14,7 +14,7 @@ const bike = { x: 0, y: 9, z: 5, yaw: 0, speed: 0, vy: 0, vx: 0, vz: 0, pitch: 0
 let score = 0, state = 'title', camMode = 0, camYaw = 0, shake = 0, time = 0;
 const keys = {}, armed = {};
 const hist = [];
-const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right', Space: 'lean', ShiftLeft: 'boost', ShiftRight: 'boost' };
+const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right', Space: 'lean', ShiftLeft: 'boost', ShiftRight: 'boost', KeyQ: 'whipL', KeyE: 'whipR' };
 addEventListener('keydown', e => {
   const k = KEYMAP[e.code];
   if (k) { keys[k] = true; e.preventDefault(); }
