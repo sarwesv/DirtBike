@@ -509,6 +509,7 @@ function setWorld(id, initial) {
   document.querySelectorAll('.world').forEach(e => e.setAttribute('aria-pressed', String(e.dataset.id === W.id)));
   const note = $('worldNote'); if (note) note.textContent = W.blurb;
   if (initial) return;
+  endRace(false);
   dataCache.clear();
   for (const k of [...chunks.keys()]) disposeChunk(k);
   for (const t of grassTiles.values()) if (t.mesh) { scene.remove(t.mesh); t.mesh.dispose(); }

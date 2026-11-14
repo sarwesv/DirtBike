@@ -73,6 +73,12 @@ function drawMap() {
       ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-8, -10); ctx.lineTo(-8, 10); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
     }
   }
+  const rt = raceTargets();
+  if (rt) rt.forEach((c, i) => {
+    const [sx, sy] = toScreen(c[0], c[1]), dd = Math.hypot(sx, sy);
+    if (dd < Cc - 10) { ctx.fillStyle = i ? 'rgba(63,208,255,0.55)' : '#3fd0ff'; ctx.strokeStyle = '#15140f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(sx, sy, i ? 7 : 11, 0, TAU); ctx.fill(); ctx.stroke(); }
+    else if (!i) { const a = Math.atan2(sy, sx); ctx.save(); ctx.translate(Math.cos(a) * (Cc - 14), Math.sin(a) * (Cc - 14)); ctx.rotate(a); ctx.fillStyle = '#3fd0ff'; ctx.strokeStyle = '#15140f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-8, -10); ctx.lineTo(-8, 10); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
+  });
   ctx.rotate(-wrapA(bike.yaw - camYaw));
   ctx.fillStyle = '#f2642a'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(11, 12); ctx.lineTo(0, 6); ctx.lineTo(-11, 12); ctx.closePath(); ctx.fill(); ctx.stroke();

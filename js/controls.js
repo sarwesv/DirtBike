@@ -21,7 +21,7 @@ addEventListener('keydown', e => {
   if (e.repeat) return;
   if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
   else if (state !== 'play') { if (e.code === 'Enter') startRide(); }
-  else if (e.code === 'KeyR') resetBike(false);
+  else if (e.code === 'KeyR') resetBike(!!race);
   else if (e.code === 'KeyC') cycleCam();
   else if (e.code === 'KeyM') toggleMute();
 });

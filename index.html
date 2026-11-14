@@ -40,6 +40,7 @@
     <div class="surf"><span class="k">Surface</span><b id="surf">Grass</b></div>
   </div>
   <div class="keys"><b>W</b> gas · <b>S</b> brake · <b>A D</b> steer · <b>Space</b> wheelie · <b>Shift</b> nitro · <b>R</b> reset. In the air: W/S flip, A/D spin, Q/E whip.</div>
+  <div id="raceHud" class="race-hud" hidden><div id="raceTime">0:00.0</div><div id="raceInfo"></div></div>
   <div id="air" class="center"></div>
   <div id="trick" class="center"></div>
   <div id="bail" class="center"></div>
@@ -79,6 +80,11 @@
       <button class="js-full" type="button">Full screen</button>
       <button class="js-gfx" type="button">Graphics: Auto · Ultra</button>
     </div>
+    <section class="events-wrap" aria-label="Races">
+      <h2 class="k">Races on this map</h2>
+      <div class="events" id="events"></div>
+      <button id="btnLeaveRace" class="leave" type="button" hidden>Leave race</button>
+    </section>
    </div>
    <section class="garage" aria-label="Choose your bike">
     <h2 class="k">Map</h2>
@@ -104,6 +110,7 @@
 <script src="js/view.js"></script>
 <script src="js/minimap.js"></script>
 <script src="js/hud.js"></script>
+<script src="js/race.js"></script>
 <script src="js/post.js"></script>
 <script src="js/main.js"></script>
 

@@ -54,6 +54,7 @@ function frame(now) {
     const n = dt > 0.02 ? 2 : 1;
     for (let i = 0; i < n; i++) step(dt / n);
     bikeParticles(dt);
+    raceTick(dt);
     saveT += dt; if (saveT > 5) { saveT = 0; save(); }
     adaptQuality(dt);
   }
@@ -85,6 +86,7 @@ function frame(now) {
 
 function start(data) {
   renderGarage();
+  renderEvents();
   applyQuality();
   setWorld((data && data.world) || savedWorld, true);
   renderWorlds();

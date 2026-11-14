@@ -47,6 +47,7 @@ function crash(reason) {
 function resetBike(fromHistory) {
   let p = { x: bike.x, z: bike.z, yaw: bike.yaw };
   if (fromHistory || terrainH(bike.x, bike.z) < WATER + 0.3) p = hist[0] || { x: 0, z: 5, yaw: 0 };
+  if (fromHistory && typeof raceRespawn === 'function' && raceRespawn()) p = raceRespawn(); // races restart at the last checkpoint
   refreshNearRamps(p.x, p.z);
   Object.assign(bike, { x: p.x, z: p.z, y: groundH(p.x, p.z), yaw: p.yaw, speed: 0, slide: 0, whip: 0, whipVel: 0, vy: 0, vx: 0, vz: 0, pitch: 0, pitchVel: 0, yawVel: 0, lean: 0, wheelie: 0, grounded: true, crashed: false, roll: 0, air: 0 });
   camYaw = p.yaw; hist.length = 0;
@@ -210,6 +211,7 @@ function step(dt) {
   }
   if (!b.crashed) collide();
   if (!b.crashed) checkFlags();
+  if (!b.crashed) raceStep();
   b.nitro = Math.min(1, b.nitro + 0.02 * dt);
   histT += dt;
   if (histT > 0.3) { histT = 0; if (b.grounded && !b.crashed && depth <= 0 && Math.abs(b.speed) > 1) { hist.push({ x: b.x, z: b.z, yaw: b.yaw }); if (hist.length > 10) hist.shift(); } }

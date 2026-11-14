@@ -10,6 +10,10 @@ Pick a map on the title screen: Open Country, Deep Forest, Red Desert, Alpine Ri
 
 Pick from thirteen bikes in the garage: Trail 250, Pit 125, Enduro 450, Rally 500, Supermoto 690, Scrambler 74, Trials 300, Factory 450R and Desert Hog 990, plus four electrics with an electric-motor sound: Volt E-MX, Spark Mini-E, Surge SX-E and Stealth E-Trail.
 
+## Races
+
+Every map has races built from its own trail: Trail Sprint, Trail Marathon, Backtrail and the two-lap Meadow Loop. Ride through the checkpoint gates against the clock for gold, silver or bronze. Your best run on each event is saved and races alongside you as a ghost.
+
 ## Project layout
 
 No build step. `index.html` loads the stylesheet, three.js from a CDN, then the game scripts in order. The scripts are plain (non-module) files that share one global scope, so the game also runs straight from disk by double-clicking `index.html`.
@@ -29,6 +33,7 @@ js/physics.js       riding, jumps, tricks, landings, crashes, flags
 js/view.js          bike model sync and chase camera
 js/minimap.js       heading-up minimap
 js/hud.js           speedometer, gears, surface and score readouts
+js/race.js          races: trail routes, gates, timer, medals, ghosts
 js/post.js          bloom, colour grade, vignette (desktop only)
 js/main.js          resize, adaptive quality, frame loop and start-up
 ```
