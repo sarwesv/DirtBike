@@ -154,10 +154,14 @@ function step(dt) {
     if (inp.up) { const top = boosting ? bikeSpec.boostTop : bikeSpec.top; const f = b.speed > 0 ? 1 - Math.pow(clamp(b.speed / top, 0, 1), 2) : 1; acc += (boosting ? bikeSpec.boostAcc : bikeSpec.acc) * f; }
     if (inp.down) { if (b.speed > 0.5) acc -= 20 * Math.min(1, 0.35 + (W.ice && terrainH(b.x, b.z) < WATER ? 0.16 : 1) * 0.8); else acc -= 7 * (1 - clamp(-b.speed / 6, 0, 1)); }
     acc -= G * Math.sin(slopeAng);
-    const surf = surfaceAt(b.x, b.z, depth), grip = surf.grip * (1 - wetness * 0.22);
+    const surf = surfaceAt(b.x, b.z, depth);
+    // Fat tyres float over loose ground; studded tyres bite into ice.
+    const loose = surf === SURF.sand || surf === SURF.snow || surf === SURF.mud;
+    const tyre = (bikeSpec.fat && loose ? 1.7 : 1) * (bikeSpec.studs ? (surf === SURF.ice ? 4.5 : surf === SURF.snow ? 1.4 : 1) : 1);
+    const grip = surf.grip * tyre * (1 - wetness * 0.22);
     b.surface = surf.name; b.onTrail = surf === SURF.trail;
     if (inp.up) acc *= Math.min(1, 0.45 + grip * 0.7); // wheelspin on loose ground
-    acc -= b.speed * surf.roll * (1 + wetness * 0.3) + 0.0035 * b.speed * sp;
+    acc -= b.speed * surf.roll * (bikeSpec.fat && loose ? 0.6 : 1) * (1 + wetness * 0.3) + 0.0035 * b.speed * sp;
     if (depth > 0) acc -= b.speed * (1.2 + depth * 3);
     b.speed += acc * dt;
     if (!inp.up && !inp.down && Math.abs(b.speed) < 0.4 && Math.abs(slopeAng) < 0.35) b.speed = 0;
@@ -196,6 +200,7 @@ function step(dt) {
       b.suspV = (b.suspV || 0) + clamp(vy1 - b.vy, -6, 6) * 0.02; // bumps work the suspension
       b.vy = vy1; b.y = gN;
     }
+    if (W.lava && depth > 0.05) return crash('Rode into the lava');
     if (depth > 1.35) return crash('Flooded the engine in the lake');
   } else {
     b.air += dt;

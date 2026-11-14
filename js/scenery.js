@@ -57,6 +57,22 @@ const PINE_FROST = mergeParts([
   [new THREE.ConeGeometry(1.2, 2.0, 9), '#c3d1ca', mtx(0, 4.65, 0, 0, 0.7, 0)],
   [new THREE.ConeGeometry(0.72, 1.6, 8), '#e6eeec', mtx(0, 5.7, 0, 0, 0.2, 0)]
 ]);
+// Palm: a curving segmented trunk and drooping fronds.
+const PALM = (() => {
+  const parts = [];
+  let px = 0, py = 0, lean = 0;
+  for (let k = 0; k < 7; k++) {
+    const r = 0.22 - k * 0.015, nx = px + 0.12 + k * 0.05, ny = py + 1.0;
+    parts.push([new THREE.CylinderGeometry(r * 0.92, r, 1.05, 8), k % 2 ? '#8a7350' : '#7a6444', mtx((px + nx) / 2, (py + ny) / 2, 0, 0, 0, -Math.atan2(nx - px, 1.0))]);
+    px = nx; py = ny; lean = Math.atan2(nx - px, 1);
+  }
+  for (let f = 0; f < 8; f++) {
+    const a = f / 8 * TAU, droop = 0.55 + (f % 2) * 0.25;
+    parts.push([new THREE.BoxGeometry(2.6, 0.04, 0.5), f % 2 ? '#4f8a36' : '#3f7a2c', mtx(px + Math.cos(a) * 1.2, py - 0.25 - droop * 0.4, Math.sin(a) * 1.2, 0, -a, -droop * Math.sign(Math.cos(0)) * 0.6)]);
+  }
+  parts.push([new THREE.SphereGeometry(0.28, 8, 6), '#6a5434', mtx(px, py - 0.1, 0)]);
+  return mergeParts(parts);
+})();
 const BUSH = mergeParts([
   [lumpy(new THREE.IcosahedronGeometry(0.8, 1), 0.35, 5), '#4c7a2e', mtx(0, 0.45, 0)],
   [lumpy(new THREE.IcosahedronGeometry(0.6, 1), 0.35, 6), '#5d8c37', mtx(0.55, 0.35, 0.2)],
@@ -307,6 +323,7 @@ const grassTiles = new Map();
 const FLOWERS = [lin('#f4d23c'), lin('#f5f2ea'), lin('#b48ad8'), lin('#e8743a')];
 function buildGrassTile(tx, tz) {
   const ox = tx * GT, oz = tz * GT;
+  if (worldHasNoGrass()) { grassTiles.set(tx + ',' + tz, { mesh: null, tx, tz }); return; }
   const { grass, col } = runGen(terrainGeoGen(ox, oz, GCELLS, CELL, { grass: true }));
   const W = GCELLS + 1, ramps = rampsAround(ox + GT / 2, oz + GT / 2);
   const rng = mulberry32((Math.imul(tx, 912367) ^ Math.imul(tz, 3571) ^ 0x77) >>> 0);
@@ -438,9 +455,9 @@ function buildChunk(cx, cz) {
   group.add(terrain);
   const d = getChunkData(cx, cz);
   const inst = [
-    makeInst(W.foliage === 'frost' ? PINE_FROST : PINE, d.trees, (col, t) => col.setRGB((0.82 + t * 0.3) * W.tint[0], (0.86 + t * 0.22) * W.tint[1], (0.8 + t * 0.2) * W.tint[2]), instMat, true, PINE_CARDS),
+    makeInst(W.foliage === 'frost' ? PINE_FROST : W.foliage === 'tropical' ? PALM : PINE, d.trees, (col, t) => col.setRGB((0.82 + t * 0.3) * W.tint[0], (0.86 + t * 0.22) * W.tint[1], (0.8 + t * 0.2) * W.tint[2]), instMat, true, W.foliage === 'tropical' ? null : PINE_CARDS),
     makeInst(W.foliage === 'autumn' ? OAK_AUTUMN : OAK, d.oaks, (col, t) => col.setRGB((0.85 + t * 0.35) * W.tint[0], (0.88 + t * 0.2) * W.tint[1], (0.8 + t * 0.1) * W.tint[2]), instMat, true, OAK_CARDS),
-    makeInst(BUSH, d.bushes, (col, t) => col.setRGB((0.85 + t * 0.3) * W.tint[0], (0.9 + t * 0.2) * W.tint[1], 0.85 * W.tint[2]), instMat, true, BUSH_CARDS),
+    makeInst(BUSH, d.bushes, (col, t) => { const bt = W.bushTint || W.tint; col.setRGB((0.85 + t * 0.3) * bt[0], (0.9 + t * 0.2) * bt[1], 0.85 * bt[2]); }, instMat, true, BUSH_CARDS),
     makeInst(CACTUS, d.cacti, (col, t) => col.setRGB(0.9 + t * 0.2, 0.9 + t * 0.15, 0.85)),
     makeInst(ROCK, d.rocks, (col, t) => col.setRGB(0.85 + t * 0.3, 0.83 + t * 0.28, 0.8 + t * 0.26), rockMat)
   ].filter(Boolean);

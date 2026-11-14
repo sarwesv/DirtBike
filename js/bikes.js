@@ -44,7 +44,16 @@ const BIKES = [
     scale: 1.04, top: 47, boostTop: 62, acc: 23, boostAcc: 34, turn: 0.98, air: 0.8, tough: 1.0, electric: true, glow: '#3fa0ff' },
   { id: 'stealth', name: 'Stealth E-Trail', num: 'E4', blurb: 'Near-silent trail electric. Grippy, tough and easy to place.',
     plastic: '#5b6066', plastic2: '#a6e22e', jersey: '#3a3e44', accent: '#a6e22e', plateBg: '#a6e22e', plateInk: '#1d1d20', numInk: '#3a4a10',
-    scale: 1.0, top: 34, boostTop: 48, acc: 20, boostAcc: 29, turn: 1.15, air: 1.1, tough: 1.25, electric: true, glow: '#b6ff3a' }
+    scale: 1.0, top: 34, boostTop: 48, acc: 20, boostAcc: 29, turn: 1.15, air: 1.1, tough: 1.25, electric: true, glow: '#b6ff3a' },
+  { id: 'cafe', name: 'Café 900', num: '9', blurb: 'Retro twin with a long seat and big torque. Fast and planted, lazy in the air.',
+    plastic: '#2d4a3a', plastic2: '#e8dcc0', jersey: '#3a2a1e', accent: '#d6dade', plateBg: '#e8dcc0', plateInk: '#2d4a3a', numInk: '#2d4a3a',
+    scale: 1.08, top: 44, boostTop: 58, acc: 16, boostAcc: 26, turn: 0.86, air: 0.65, tough: 1.35, vintage: true },
+  { id: 'bigfoot', name: 'Bigfoot E', num: 'E5', blurb: 'Fat-tyre electric. Floats over sand, snow and mud where others bog down.',
+    plastic: '#ff8a1f', plastic2: '#2a2c31', jersey: '#2a2c31', accent: '#ff8a1f', plateBg: '#2a2c31', plateInk: '#ff8a1f', numInk: '#ff8a1f',
+    scale: 1.0, top: 30, boostTop: 43, acc: 19, boostAcc: 27, turn: 1.0, air: 0.95, tough: 1.3, electric: true, glow: '#ffa84a', fat: true },
+  { id: 'ice', name: 'Ice Racer 450', num: '45i', blurb: 'Studded tyres that bite into frozen lakes and packed snow.',
+    plastic: '#e9f2f8', plastic2: '#2a6fd6', jersey: '#2a6fd6', accent: '#c4c9ce', plateBg: '#2a6fd6', plateInk: '#f4f1e8', numInk: '#2a6fd6',
+    scale: 1.02, top: 37, boostTop: 51, acc: 18, boostAcc: 28, turn: 1.05, air: 1.0, tough: 1.1, studs: true }
 ];
 let bikeSpec = BIKES[0];
 // Per-bike colours that are not part of the handling spec.
@@ -61,7 +70,10 @@ const LOOKS = {
   hog: { frame: '#2a2c31', pants: '#5a5446', helmet: '#e0b04a', lens: '#ff9a3c', rim: '#2a2c31' },
   spark: { frame: '#1d1d20', pants: '#1d1d20', helmet: '#ffd23f', lens: '#7ad8ff', rim: '#ffd23f' },
   surge: { frame: '#2a2c31', pants: '#16181d', helmet: '#16181d', lens: '#2f8cff', rim: '#2f8cff' },
-  stealth: { frame: '#3a3e44', pants: '#3a3e44', helmet: '#5b6066', lens: '#a6e22e', rim: '#1d1d20' }
+  stealth: { frame: '#3a3e44', pants: '#3a3e44', helmet: '#5b6066', lens: '#a6e22e', rim: '#1d1d20' },
+  cafe: { frame: '#1d1d20', pants: '#3a3a40', helmet: '#e8dcc0', lens: '#c7a24a', rim: '#d6dade' },
+  bigfoot: { frame: '#2a2c31', pants: '#2a2c31', helmet: '#ff8a1f', lens: '#ffd84a', rim: '#2a2c31' },
+  ice: { frame: '#c4c9ce', pants: '#1d2a44', helmet: '#e9f2f8', lens: '#7ad8ff', rim: '#2a6fd6' }
 };
 function plateTexture(spec, transparent) {
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 96;
@@ -247,7 +259,13 @@ function buildBike(spec) {
   /* Wheels: knobby tyre, coloured rim, 32 laced spokes, hub and wavy brake disc. */
   const wheel = (parent, z, front) => {
     const g = new THREE.Group();
-    put(g, new THREE.TorusGeometry(R_WHEEL - 0.075, 0.082, 18, 72), tyreMat, [0, 0, 0], [0, Math.PI / 2, 0]);
+    const tw = spec.fat ? 1.55 : 1;
+    put(g, new THREE.TorusGeometry(R_WHEEL - 0.075, 0.082, 18, 72), tyreMat, [0, 0, 0], [0, Math.PI / 2, 0]).scale.set(1, 1, tw);
+    if (spec.studs) {
+      const studs = [];
+      for (let k = 0; k < 64; k++) { const a = k / 64 * TAU, off = ((k % 3) - 1) * 0.05; studs.push([new THREE.CylinderGeometry(0.006, 0.006, 0.03, 5), '#e8ecef', mtx(off, Math.cos(a) * (R_WHEEL + 0.008), Math.sin(a) * (R_WHEEL + 0.008), -a, 0, 0)]); }
+      put(g, mergeParts(studs), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.2, metalness: 1 }));
+    }
     const knobs = [];
     for (let k = 0; k < 56; k++) {
       const a = k / 56 * TAU, rr = R_WHEEL - 0.004;
@@ -256,7 +274,7 @@ function buildBike(spec) {
         knobs.push([new THREE.BoxGeometry(0.042, 0.028, 0.04), '#18181b', mtx(s * 0.055, Math.cos(a) * (rr - 0.012), Math.sin(a) * (rr - 0.012), -a, 0, -s * 0.5)]);
       if (k % 2 === 0) knobs.push([new THREE.BoxGeometry(0.05, 0.026, 0.036), '#18181b', mtx(0, Math.cos(a + 0.05) * rr, Math.sin(a + 0.05) * rr, -a - 0.05, 0, 0)]);
     }
-    put(g, mergeParts(knobs), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 }));
+    put(g, mergeParts(knobs), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 })).scale.set(tw, 1, 1);
     put(g, new THREE.TorusGeometry(R_WHEEL - 0.15, 0.022, 8, 64), rimMat, [0, 0, 0], [0, Math.PI / 2, 0]);
     put(g, new THREE.BoxGeometry(0.03, 0.03, 0.05), alu, [0, -(R_WHEEL - 0.165), 0]);
     put(g, new THREE.CylinderGeometry(0.006, 0.006, 0.05, 6), chrome, [0.01, R_WHEEL - 0.18, 0.02], [0.3, 0, 0]);
@@ -516,7 +534,7 @@ function buildBike(spec) {
 }
 // Mud colour follows the map (dust in the desert, dark mud in the wetlands, slush on the tundra).
 const grimeMud = new THREE.Color();
-function setGrimeColor() { grimeMud.copy(lin({ desert: '#b4906a', canyon: '#a8714a', tundra: '#9aa1a8', swamp: '#3b3424', autumn: '#5a4430', forest: '#4e3c2a' }[W.id] || '#5f4a34')); }
+function setGrimeColor() { grimeMud.copy(lin({ desert: '#b4906a', canyon: '#a8714a', tundra: '#9aa1a8', swamp: '#3b3424', autumn: '#5a4430', forest: '#4e3c2a', volcano: '#2a2523', salt: '#d8d2c4', tropical: '#c9b48a', highland: '#4a3e30' }[W.id] || '#5f4a34')); }
 setGrimeColor();
 // Clone a material with dirt layered in. Noise comes from each part's own geometry so it sticks to the part;
 // height (for "body") is measured in the bike's frame so mud collects low, around the wheels and engine.

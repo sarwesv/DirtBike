@@ -4,8 +4,8 @@
 'use strict';
 
 /* ---------- Prices ---------- */
-const BIKE_PRICE = { trail: 0, pit: 0, enduro: 400, spark: 450, scrambler: 500, volt: 700, trials: 800, rally: 900, stealth: 900, super: 1100, hog: 1300, factory: 1500, surge: 1600 };
-const WORLD_PRICE = { open: 0, forest: 300, desert: 300, autumn: 500, swamp: 500, tundra: 800, alpine: 800, canyon: 1000 };
+const BIKE_PRICE = { trail: 0, pit: 0, enduro: 400, spark: 450, scrambler: 500, volt: 700, trials: 800, rally: 900, stealth: 900, super: 1100, hog: 1300, factory: 1500, surge: 1600, cafe: 1200, bigfoot: 1000, ice: 900 };
+const WORLD_PRICE = { open: 0, forest: 300, desert: 300, autumn: 500, swamp: 500, tundra: 800, alpine: 800, canyon: 1000, highland: 500, tropical: 600, salt: 700, volcano: 1200 };
 // Paint jobs recolour plastics, rider gear and helmet on any bike. `null` keeps the bike's own colour.
 const PAINTS = [
   { id: 'stock', name: 'Stock', price: 0, swatch: null },

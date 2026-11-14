@@ -19,13 +19,14 @@ function refreshMap() {
       let r, g, bl;
       const onT = Math.abs(lastTrailD) < 5.5;
       if (h < WATER && W.ice) { r = 200; g = 222; bl = 234; }
+      else if (h < WATER && W.lava) { r = 230; g = 90; bl = 20; }
       else if (h < WATER) { const k = clamp(1 + h / 12, 0.55, 1); r = 52 * k; g = 105 * k; bl = 142 * k; }
       else if (onT) { r = 122; g = 84; bl = 50; }
       else {
         const des = desertness(x, z);
         if (h > W.snowLine + 8) { r = 232; g = 236; bl = 238; }
         else if (h > 42 && mountainMask(x, z) > 0.3) { r = 128; g = 120; bl = 110; }
-        else { r = lerp(104, 214, des); g = lerp(138, 166, des); bl = lerp(62, 104, des); }
+        else { const s = v => Math.pow(v, 1 / 2.2) * 255, ga = COL.grassA, du = COL.dune; r = lerp(s(ga[0]), s(du[0]), des); g = lerp(s(ga[1]), s(du[1]), des); bl = lerp(s(ga[2]), s(du[2]), des); }
         const sh = prev === null ? 1 : clamp(1 + (prev - h) * 0.09, 0.72, 1.28);
         r *= sh; g *= sh; bl *= sh;
       }

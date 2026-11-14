@@ -6,7 +6,7 @@
 /* ---------- World shape ---------- */
 const WATER = 0, CELL = 4, CN = 50, CS = CELL * CN, VIEW_R = 2;
 /* Maps. Each one reshapes the same noise world: biome mix, mountain size, tree count, snow line and sky. */
-const WORLD_DEFAULTS = { hills: 1, terrace: 0, oak: 0.42, oakMax: 32, foliage: 'summer', ice: false, tint: [1, 1, 1], pal: {}, water: { deep: '#1d4f68', shallow: '#3b8aa0', ice: 0 } };
+const WORLD_DEFAULTS = { dunes: 1, rocks: 1, noGrass: false, lava: false, bushTint: null, hills: 1, terrace: 0, oak: 0.42, oakMax: 32, foliage: 'summer', ice: false, tint: [1, 1, 1], pal: {}, water: { deep: '#1d4f68', shallow: '#3b8aa0', ice: 0 } };
 const WORLDS = [
   { id: 'open', name: 'Open Country', blurb: 'Meadows, pine stands, desert edges, lakes and snowy ridges.', swatch: '#7fa64a',
     desert: null, mount: 1, mountCover: 0, base: 0, forest: 0, trees: 120, bushes: 70, snowLine: 60, treeLine: 64,
@@ -37,8 +37,28 @@ const WORLDS = [
     desert: 0, mount: 0.15, mountCover: 0, base: -1.2, hills: 0.55, forest: 0.15, trees: 200, bushes: 160, snowLine: 200, treeLine: 60,
     fog: 0.0032, horizon: '#aebaa8', top: '#7b98a8', below: '#7c8a74', sun: '#f0ead2', oak: 0.7, oakMax: 60, tint: [0.72, 0.82, 0.66],
     water: { deep: '#2a3624', shallow: '#4c5d36', ice: 0 }, pal: { grassA: '#3b5a24', grassB: '#55722c', dry: '#6f7a3a', sand: '#7c7350', wet: '#5a5638', bed: '#3d3a28' } }
+,
+  { id: 'volcano', name: 'Volcanic Badlands', blurb: 'Black ash plains, charred trees and glowing lava lakes. Do not touch the lava.', swatch: '#2b2522',
+    desert: 0, mount: 1.1, mountCover: 0.12, base: -0.6, hills: 1.1, forest: -0.2, trees: 70, bushes: 10, rocks: 2.2, snowLine: 300, treeLine: 60,
+    fog: 0.0017, horizon: '#8f7b72', top: '#4f5f78', below: '#5a4a44', sun: '#ffd7b0', lava: true, tint: [0.32, 0.28, 0.26],
+    water: { deep: '#ff5a10', shallow: '#ffb030', ice: 0 },
+    pal: { grassA: '#37322f', grassB: '#463f3a', dry: '#55483f', dirt: '#3a2f2a', rock: '#2f2c2b', rockB: '#1e1c1b', sand: '#4b3f38', wet: '#2a2220', bed: '#1a1414', forest: '#2a2522' } },
+  { id: 'salt', name: 'Salt Flats', blurb: 'A blinding white plain, flat to the horizon. Open the throttle.', swatch: '#efece4',
+    desert: 1, dunes: 0, noGrass: true, mount: 0.55, mountCover: -0.05, base: 4, hills: 0.12, forest: -1, trees: 0, bushes: 0, rocks: 0.3, snowLine: 300, treeLine: 300,
+    fog: 0.0007, horizon: '#e4e9ee', top: '#3f86d0', below: '#d8d4ca', sun: '#fffaf0',
+    pal: { dune: '#eeebe3', duneB: '#e2ded4', sand: '#f2efe8', dirt: '#cfc8b8', rock: '#9c8f80', rockB: '#7d7064' } },
+  { id: 'tropical', name: 'Tropical Coast', blurb: 'Sandy islands, turquoise lagoons and palm groves.', swatch: '#2fc0c0',
+    desert: 0, mount: 0.35, mountCover: 0, base: -2.6, hills: 0.85, forest: 0.1, trees: 170, bushes: 120, snowLine: 300, treeLine: 60, foliage: 'tropical',
+    fog: 0.0011, horizon: '#cfe7ee', top: '#2f86d8', below: '#b9d4cc', sun: '#fff6e0',
+    water: { deep: '#0f6f8f', shallow: '#3fd6cc', ice: 0 },
+    pal: { grassA: '#4f8a2c', grassB: '#7aae3a', sand: '#f0dfae', wet: '#d8c48e', bed: '#c8b98a', dune: '#efdcaa', duneB: '#e2c98f' } },
+  { id: 'highland', name: 'Highland Moor', blurb: 'Rolling heather moorland, misty hills and rocky tors.', swatch: '#7a5a7a',
+    desert: 0, mount: 0.5, mountCover: 0.05, base: 2, hills: 1.45, forest: -0.35, trees: 50, bushes: 140, rocks: 2.4, snowLine: 120, treeLine: 70,
+    fog: 0.002, horizon: '#c4c8cc', top: '#6b8aa8', below: '#8a8a84', sun: '#f6efe2', bushTint: [1.15, 0.72, 1.12],
+    pal: { grassA: '#566a36', grassB: '#7a5878', dry: '#8a7a4a', dirt: '#5d4a3a', rock: '#7d7a74', rockB: '#5b5853' } }
 ].map(w => Object.assign({}, WORLD_DEFAULTS, w));
 let W = WORLDS[0];
+const worldHasNoGrass = () => W.noGrass; // for code that has its own local `W`
 // Open Country keeps the original flag ids so earlier saves still count.
 const flagPrefix = () => W.id === 'open' ? '' : W.id + '/';
 function desertness(x, z) { return W.desert !== null ? W.desert : smooth(0.12, 0.38, noise(x * 0.0011 + 77.3, z * 0.0011 - 33.1)); }
@@ -80,7 +100,7 @@ function rawHeight(x, z) {
   if (mm > 0) { const r = 1 - Math.abs(fbm(x * 0.0026 + 3.1, z * 0.0026 + 9.4, 3)); mount = mm * r * r * r * 95 * W.mount; }
   const des = desertness(x, z);
   let dunes = 0;
-  if (des > 0) dunes = des * (Math.sin(x * 0.05 + z * 0.018 + noise(x * 0.008, z * 0.008) * 4) * 0.5 + 0.5) * 3.2;
+  if (des > 0) dunes = des * (Math.sin(x * 0.05 + z * 0.018 + noise(x * 0.008, z * 0.008) * 4) * 0.5 + 0.5) * 3.2 * W.dunes;
   const bumps = noise(x * 0.07 + .5, z * 0.07 + .5) * 0.45;
   let h = 6 + W.base + hills + mount + dunes + bumps, hs = 6 + W.base + hills + mount + dunes * 0.4;
   if (W.terrace) {
@@ -210,7 +230,7 @@ function getChunkData(cx, cz) {
     if (x * x + z * z < 45 * 45 || nearRamp(x, z)) continue;
     const h = rawHeight(x, z);
     if (h < WATER - 0.5 || Math.abs(lastTrailD) < 5) continue;
-    if (r > 0.18 + mountainMask(x, z) * 0.6) continue;
+    if (r > (0.18 + mountainMask(x, z) * 0.6) * W.rocks) continue;
     const sc = 0.6 + s * s * 2.2;
     const o = { x, z, y: terrainH(x, z) - sc * 0.25, s: sc, sy: sc * (0.55 + sq * 0.4), rot, tint, tilt: true };
     d.rocks.push(o); d.obs.push({ x, z, y: o.y, r: 0.85 * sc, top: o.sy * 0.9, kind: 'rock' });
