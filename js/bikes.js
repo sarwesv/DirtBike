@@ -35,7 +35,16 @@ const BIKES = [
     scale: 1.03, top: 40, boostTop: 54, acc: 20, boostAcc: 30, turn: 1.08, air: 1.08, tough: 1.15 },
   { id: 'hog', name: 'Desert Hog 990', num: '99', blurb: 'Twin-cylinder adventure tank. Huge top speed, barely leaves the ground.',
     plastic: '#3f4a3a', plastic2: '#e0b04a', jersey: '#3f4a3a', accent: '#2a2c31', plateBg: '#e0b04a', plateInk: '#1d1d20', numInk: '#1d1d20',
-    scale: 1.16, top: 50, boostTop: 64, acc: 15, boostAcc: 25, turn: 0.72, air: 0.55, tough: 1.55, rally: true }
+    scale: 1.16, top: 50, boostTop: 64, acc: 15, boostAcc: 25, turn: 0.72, air: 0.55, tough: 1.55, rally: true },
+  { id: 'spark', name: 'Spark Mini-E', num: 'E7', blurb: 'Pocket-sized electric. Silly agile, spins on a coin, tops out early.',
+    plastic: '#ffd23f', plastic2: '#1d1d20', jersey: '#1d1d20', accent: '#ffd23f', plateBg: '#1d1d20', plateInk: '#ffd23f', numInk: '#ffd23f',
+    scale: 0.78, top: 21, boostTop: 31, acc: 19, boostAcc: 27, turn: 1.45, air: 1.5, tough: 0.8, electric: true, glow: '#ffd23f' },
+  { id: 'surge', name: 'Surge SX-E', num: 'E9', blurb: 'Electric supermoto. Brutal launch and a huge top end, heavy in the air.',
+    plastic: '#16181d', plastic2: '#2f8cff', jersey: '#16181d', accent: '#2f8cff', plateBg: '#2f8cff', plateInk: '#f4f1e8', numInk: '#2f8cff',
+    scale: 1.04, top: 47, boostTop: 62, acc: 23, boostAcc: 34, turn: 0.98, air: 0.8, tough: 1.0, electric: true, glow: '#3fa0ff' },
+  { id: 'stealth', name: 'Stealth E-Trail', num: 'E4', blurb: 'Near-silent trail electric. Grippy, tough and easy to place.',
+    plastic: '#5b6066', plastic2: '#a6e22e', jersey: '#3a3e44', accent: '#a6e22e', plateBg: '#a6e22e', plateInk: '#1d1d20', numInk: '#3a4a10',
+    scale: 1.0, top: 34, boostTop: 48, acc: 20, boostAcc: 29, turn: 1.15, air: 1.1, tough: 1.25, electric: true, glow: '#b6ff3a' }
 ];
 let bikeSpec = BIKES[0];
 // Per-bike colours that are not part of the handling spec.
@@ -49,7 +58,10 @@ const LOOKS = {
   scrambler: { frame: '#1d1d20', pants: '#3b4a5a', helmet: '#e8dcc0', lens: '#c7a24a', rim: '#d6dade' },
   trials: { frame: '#c4c9ce', pants: '#1d1d20', helmet: '#f4f1e8', lens: '#7ad8ff', rim: '#1d1d20' },
   factory: { frame: '#ff7a00', pants: '#1b2a4a', helmet: '#ff7a00', lens: '#ffd84a', rim: '#d9a441' },
-  hog: { frame: '#2a2c31', pants: '#5a5446', helmet: '#e0b04a', lens: '#ff9a3c', rim: '#2a2c31' }
+  hog: { frame: '#2a2c31', pants: '#5a5446', helmet: '#e0b04a', lens: '#ff9a3c', rim: '#2a2c31' },
+  spark: { frame: '#1d1d20', pants: '#1d1d20', helmet: '#ffd23f', lens: '#7ad8ff', rim: '#ffd23f' },
+  surge: { frame: '#2a2c31', pants: '#16181d', helmet: '#16181d', lens: '#2f8cff', rim: '#2f8cff' },
+  stealth: { frame: '#3a3e44', pants: '#3a3e44', helmet: '#5b6066', lens: '#a6e22e', rim: '#1d1d20' }
 };
 function plateTexture(spec, transparent) {
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 96;
@@ -282,6 +294,15 @@ function buildBike(spec) {
     slab(body, [[-0.14, 0.32], [0.3, 0.3], [0.4, 0.5], [0.34, 0.8], [0.02, 0.84], [-0.14, 0.62]], 0.24, darkMetal, 0, 0.025);
     for (const s of [-1, 1]) slab(body, [[-0.1, 0.36], [0.28, 0.34], [0.36, 0.5], [0.3, 0.76], [0.04, 0.78], [-0.1, 0.6]], 0.02, plastic2, s * 0.13, 0.006);
     disc(body, 0.1, 0.16, alu, [0, 0.42, -0.08], 24);
+    // Glowing LED strips along the battery and a charge port with a lit ring.
+    const led = new THREE.MeshStandardMaterial({ color: lin(spec.glow || spec.accent), emissive: lin(spec.glow || spec.accent), emissiveIntensity: 2.2, roughness: 0.3 });
+    for (const s of [-1, 1]) {
+      tube(body, [[s * 0.142, 0.4, -0.06], [s * 0.142, 0.42, 0.22], [s * 0.142, 0.6, 0.32], [s * 0.142, 0.74, 0.24]], 0.006, led, 24);
+      put(body, new THREE.BoxGeometry(0.004, 0.02, 0.22), led, [s * 0.143, 0.7, 0.1]);
+    }
+    disc(body, 0.026, 0.02, darkMetal, [0.13, 0.62, -0.04], 16);
+    put(body, new THREE.TorusGeometry(0.024, 0.004, 6, 20), led, [0.141, 0.62, -0.04], [0, Math.PI / 2, 0]);
+    put(body, new THREE.BoxGeometry(0.18, 0.1, 0.12), darkMetal, [0, 0.9, 0.16]);
   } else {
   slab(body, [[-0.12, 0.33], [0.24, 0.3], [0.33, 0.42], [0.27, 0.57], [0.05, 0.62], [-0.12, 0.56]], 0.24, darkMetal);
   disc(body, 0.11, 0.05, mag, [0.135, 0.44, 0.06], 28);
@@ -474,7 +495,7 @@ function renderGarage() {
     btn.setAttribute('aria-pressed', String(b.id === bikeSpec.id));
     btn.style.setProperty('--c', b.plastic); btn.style.setProperty('--n', b.numInk);
     btn.innerHTML = `<span class="swatch">${b.num}</span><span class="bname">${b.name}</span><span class="blurb">${b.blurb}</span>` +
-      `<span class="bars">${stat('Speed', b.top / 50)}${stat('Accel', (b.acc - 11) / 10)}${stat('Handling', b.turn / 1.3)}${stat('Air', b.air / 1.65)}</span>`;
+      `<span class="bars">${stat('Speed', b.top / 50)}${stat('Accel', (b.acc - 11) / 12)}${stat('Handling', b.turn / 1.3)}${stat('Air', b.air / 1.65)}</span>`;
     btn.addEventListener('click', () => setBike(b.id));
     wrap.appendChild(btn);
   }

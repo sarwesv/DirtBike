@@ -8,7 +8,7 @@ Dirt trails wind endlessly across the map. Each one is a contour line of domain-
 
 Pick a map on the title screen: Open Country, Deep Forest, Red Desert, Alpine Ridge, Autumn Woods, Canyonlands, Frozen Tundra (ride across frozen lakes) or Misty Wetlands. Each reshapes the world, ground colours, trees, water, sky and fog and has its own flags.
 
-Pick from ten bikes in the garage: Trail 250, Pit 125, Enduro 450, Rally 500, Supermoto 690, Volt E-MX (electric), Scrambler 74, Trials 300, Factory 450R and Desert Hog 990.
+Pick from thirteen bikes in the garage: Trail 250, Pit 125, Enduro 450, Rally 500, Supermoto 690, Scrambler 74, Trials 300, Factory 450R and Desert Hog 990, plus four electrics with an electric-motor sound: Volt E-MX, Spark Mini-E, Surge SX-E and Stealth E-Trail.
 
 ## Project layout
 

@@ -35,7 +35,18 @@ function chime() {
 }
 function updAudio(rpm, thr) {
   if (!audio) return;
-  const t = audio.ac.currentTime, fr = 34 + rpm * 100 + thr * 8;
+  const t = audio.ac.currentTime, elec = typeof bikeSpec !== 'undefined' && !!bikeSpec.electric;
+  // Electric bikes swap the engine's buzz for a smooth rising motor whine.
+  if (audio.elec !== elec) { audio.elec = elec; audio.o1.type = elec ? 'triangle' : 'sawtooth'; audio.o2.type = elec ? 'sine' : 'square'; audio.f.Q.value = elec ? 1 : 3; }
+  if (elec) {
+    const fr = 140 + rpm * 900 + thr * 60;
+    audio.o1.frequency.setTargetAtTime(fr, t, 0.05);
+    audio.o2.frequency.setTargetAtTime(fr * 1.5, t, 0.05);
+    audio.f.frequency.setTargetAtTime(1800 + rpm * 3000, t, 0.05);
+    audio.g.gain.setTargetAtTime(muted || state !== 'play' ? 0 : 0.012 + thr * 0.03 + rpm * 0.01, t, 0.08);
+    return;
+  }
+  const fr = 34 + rpm * 100 + thr * 8;
   audio.o1.frequency.setTargetAtTime(fr, t, 0.04);
   audio.o2.frequency.setTargetAtTime(fr * 0.5, t, 0.04);
   audio.f.frequency.setTargetAtTime(420 + rpm * 1500 + thr * 400, t, 0.05);
